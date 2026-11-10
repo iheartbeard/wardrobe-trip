@@ -22,6 +22,9 @@ export const LUGGAGE = {
 
 export const DEFAULT_LUGGAGE = 'carryon';
 
+/** Поездка до стольких дней включительно считается короткой: с чемоданом берутся две пары обуви, а не три. */
+export const SHORT_TRIP_DAYS = 4;
+
 export const SLOT_TITLES = {
   o: 'Верхняя одежда',
   m: 'Средний слой',
@@ -130,6 +133,10 @@ export function tripOutfits(pool, conditions) {
  */
 export function buildCapsule(pool, days, options = {}) {
   const limits = {...(LUGGAGE[options.luggage] || LUGGAGE[DEFAULT_LUGGAGE])};
+  /* С чемоданом обычно 2–3 пары, включая ту, в которой едешь: на короткую поездку две, на длинную три */
+  if (limits.s > 2 && days.length <= SHORT_TRIP_DAYS) {
+    limits.s = 2;
+  }
   const excluded = new Set([...(options.excluded || []), ...EVENT_ONLY, ...NOT_FOR_WALKING]);
   const pinned = (options.pinned || []).filter((id) => pool.items[id] && !excluded.has(id));
   const conditions = uniqueConditions(days);
