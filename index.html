@@ -46,17 +46,19 @@
       <div class="fields" id="place-fields">
         <label class="fld fld--wide">
           <span>Куда</span>
-          <span class="combo">
-            <input id="q" type="search" placeholder="Город, например Лиссабон" enterkeyhint="search" />
-            <button class="btn" id="find" type="button">Найти</button>
-          </span>
+          <input id="q" type="search" placeholder="Начни вводить город" enterkeyhint="search" autocomplete="off" />
         </label>
         <div class="places" id="places" hidden></div>
         <label class="fld"><span>Туда</span><input id="start" type="date" required /></label>
         <label class="fld"><span>Обратно</span><input id="end" type="date" required /></label>
+        <div class="wx-preview" id="wx-preview" aria-live="polite" hidden></div>
       </div>
 
       <div class="fields" id="manual-fields" hidden>
+        <div class="row fld--wide">
+          <span class="lab" id="lab-season">Сезон</span>
+          <div class="seg" id="season" role="group" aria-labelledby="lab-season"></div>
+        </div>
         <label class="fld"><span>Дней</span><input id="days" type="number" min="1" max="30" value="7" /></label>
         <label class="fld"
           ><span>Прохладнее всего, °C</span><input id="tmin" type="number" min="-5" max="35" value="12"

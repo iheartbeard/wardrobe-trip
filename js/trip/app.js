@@ -14,6 +14,8 @@ import {
   capsuleSlot,
   manualDays,
   planDays,
+  SEASON_LABELS,
+  seasonOf,
 } from './capsule.js';
 import {searchPlaces, tripWeather} from './forecast.js';
 
@@ -110,6 +112,12 @@ const placeLabel = (place) => `${place.name}${place.country ? `, ${place.country
 
 /** Переключатели режима и багажа. Поля ввода здесь не трогаются, чтобы не сбросить то, что уже введено. */
 function renderForm() {
+  const season = manualSeason();
+  $('season').innerHTML = Object.entries(SEASON_LABELS)
+    .map(
+      ([key, label]) => `<button type="button" data-season="${key}" aria-pressed="${key === season}">${label}</button>`,
+    )
+    .join('');
   doc
     .querySelectorAll('#mode button')
     .forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === state.mode)));
@@ -141,10 +149,14 @@ function fillInputs() {
   $('travel-shoe').value = pool.items[state.travelShoe] ? state.travelShoe : '';
 }
 
+/** Сезон ручного режима: выбранный или по сегодняшнему месяцу. */
+const manualSeason = () => state.manual.season || seasonOf(new Date().toISOString().slice(0, 10));
+
 function readForm() {
   state.start = $('start').value;
   state.end = $('end').value;
   state.manual = {
+    season: state.manual.season,
     days: Number($('days').value) || 1,
     tmin: Number($('tmin').value),
     tmax: Number($('tmax').value),
@@ -176,61 +188,116 @@ function renderPlaces(list) {
     box.hidden = true;
     $('q').value = placeLabel(state.place);
     save();
+    refreshWeather();
   };
 }
 
+let searchToken = 0;
+let searchTimer = null;
+
+/** Подсказки места по мере ввода: запрос уходит через 300 мс после последней буквы. */
 async function findPlace() {
   const query = $('q').value.trim();
-  if (!query) {
+  if (query.length < 2) {
+    $('places').hidden = true;
     return;
   }
   state.query = query;
-  state.place = null;
-  status('Ищу место…');
+  const token = ++searchToken;
   try {
     const list = await searchPlaces(query);
-    renderPlaces(list);
-    if (list.length === 1) {
-      $('places').querySelector('[data-i]').click();
+    if (token !== searchToken || state.place) {
+      return;
     }
+    renderPlaces(list);
     status('');
   } catch {
-    status('Без сети место не найти. Можно задать погоду вручную.');
+    if (token === searchToken) {
+      status('Без сети место не найти. Можно задать погоду вручную.');
+    }
   }
+}
+
+function suggestPlaces() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(findPlace, 300);
+}
+
+let weatherToken = 0;
+
+/** Погода для выбранного места и дат и краткая сводка под формой. */
+async function refreshWeather() {
+  readForm();
+  const box = $('wx-preview');
+  if (!state.place || !state.start || !state.end || state.end < state.start) {
+    box.hidden = true;
+    return false;
+  }
+  const token = ++weatherToken;
+  box.hidden = false;
+  box.textContent = 'Смотрю погоду…';
+  try {
+    const weather = await tripWeather(state.place, state.start, state.end);
+    if (token !== weatherToken) {
+      return false;
+    }
+    state.weather = {...weather, place: state.place.name, start: state.start, end: state.end};
+    save();
+    renderWeatherPreview();
+    return true;
+  } catch {
+    if (token === weatherToken) {
+      box.textContent = 'Погоду получить не удалось. Проверь сеть или задай погоду вручную.';
+    }
+    return false;
+  }
+}
+
+function renderWeatherPreview() {
+  const box = $('wx-preview');
+  const w = state.weather;
+  if (!w || !state.place || w.place !== state.place.name || w.start !== state.start || w.end !== state.end) {
+    box.hidden = true;
+    return;
+  }
+  const days = w.days;
+  const highs = days.map((d) => d.tmax);
+  const lows = days.map((d) => d.tmin);
+  const rainy = days.filter((d) => d.rain).length;
+  const seasons = [...new Set(days.map((d) => SEASON_LABELS[seasonOf(d.date)]))].join(' и ').toLowerCase();
+  const source =
+    w.source === 'forecast' ? 'прогноз' : `ориентир по тем же датам ${w.year} года, прогноза так далеко ещё нет`;
+  box.hidden = false;
+  box.innerHTML =
+    `<span><b>${esc(placeLabel(state.place))}</b>, ${esc(weekday(w.start))} — ${esc(weekday(w.end))}</span>` +
+    `<span>Днём ${formatTemp(Math.min(...highs))}…${formatTemp(Math.max(...highs))} °C, ночью ${formatTemp(Math.min(...lows))}…${formatTemp(Math.max(...lows))} °C (ощущается)</span>` +
+    `<span>${rainy ? `Дождь ${rainy} ${rainy === 1 ? 'день' : rainy < 5 ? 'дня' : 'дней'} из ${days.length}` : 'Без дождя'} · сезон: ${esc(seasons)}</span>` +
+    `<small>${esc(source)}</small>`;
 }
 
 /* ---------- сборка ---------- */
 
 function tripDays() {
   if (state.mode === 'manual') {
-    return manualDays(state.manual);
+    return manualDays({...state.manual, season: manualSeason()});
   }
-  return state.weather ? state.weather.days : [];
+  return state.weather ? state.weather.days.map((day) => ({...day, season: seasonOf(day.date)})) : [];
 }
 
 async function submit() {
   readForm();
   if (state.mode === 'place') {
     if (!state.place) {
-      await findPlace();
-      if (!state.place) {
-        status('Выбери место из списка.');
-        return;
-      }
+      status('Начни вводить город и выбери его из подсказок.');
+      return;
     }
     if (!state.start || !state.end || state.end < state.start) {
       status('Проверь даты поездки.');
       return;
     }
     status('Смотрю погоду…');
-    try {
-      state.weather = {
-        ...(await tripWeather(state.place, state.start, state.end)),
-        place: state.place.name,
-        start: state.start,
-        end: state.end,
-      };
-    } catch {
+    const ok = await refreshWeather();
+    if (!ok) {
       if (!state.weather) {
         status('Погоду получить не удалось. Можно задать её вручную.');
         return;
@@ -309,6 +376,9 @@ function renderStats(capsule, days) {
     : '<p class="note">Погода задана вручную: температуры разложены по дням от тёплых к прохладным.</p>';
 
   const lines = [];
+  if (days.some((day) => day.season === 'spring')) {
+    lines.push('Весенних вещей в гардеробе пока нет: на весенние дни берутся вещи, отмеченные на осень.');
+  }
   const name = (c) => `${formatTemp(c.t)}${c.rain ? ' в дождь' : ''}`;
   if (capsule.impossible.length) {
     lines.push(`Для ${capsule.impossible.map(name).join(', ')} в гардеробе нет подходящего образа.`);
@@ -539,17 +609,32 @@ function bind() {
       }
     }
   });
-  $('find').addEventListener('click', findPlace);
   $('q').addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
       event.preventDefault();
-      findPlace();
+      const first = $('places').querySelector('[data-i]');
+      if (first && !$('places').hidden) {
+        first.click();
+      }
     }
   });
   $('q').addEventListener('input', () => {
     state.place = null;
     state.query = $('q').value.trim();
+    $('wx-preview').hidden = true;
     save();
+    suggestPlaces();
+  });
+  $('season').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-season]');
+    if (button) {
+      state.manual.season = button.dataset.season;
+      save();
+      renderForm();
+      if (lastCapsule) {
+        rebuild();
+      }
+    }
   });
   /* Даты и ручная погода запоминаются сразу, без нажатия «Собрать капсулу» */
   $('travel-shoe').addEventListener('change', () => {
@@ -570,6 +655,9 @@ function bind() {
     if (event.target.matches('#start, #end, #days, #tmin, #tmax, #rain')) {
       readForm();
       save();
+      if (event.target.matches('#start, #end') && state.place) {
+        refreshWeather();
+      }
     }
   });
   $('form').addEventListener('submit', (event) => {
@@ -621,6 +709,7 @@ function bind() {
     lastPlan = [];
     $('out').hidden = true;
     $('places').hidden = true;
+    $('wx-preview').hidden = true;
     status('');
     renderForm();
     fillInputs();
@@ -635,6 +724,7 @@ function bind() {
 renderForm();
 fillInputs();
 bind();
+renderWeatherPreview();
 if (state.built) {
   rebuild();
 }

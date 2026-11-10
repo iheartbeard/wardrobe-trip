@@ -377,3 +377,23 @@
 .road + .rainy {
   margin-left: 0;
 }
+
+.wx-preview {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.wx-preview b {
+  font-weight: 600;
+}
+.wx-preview small {
+  color: var(--muted);
+}
+#manual-fields .row {
+  grid-column: 1 / -1;
+}

@@ -54,7 +54,10 @@ const COVER_WEIGHT = 1000;
 
 /** Модели всех сезонов и общий каталог вещей. У аксессуаров диапазоны сезонов объединяются. */
 export function buildPool() {
-  const models = [...Object.keys(SEASONS).map((key) => buildModel(key)), buildModel('summer', SUMMER_SEASON)];
+  const models = [
+    ...Object.keys(SEASONS).map((key) => Object.assign(buildModel(key), {season: key})),
+    Object.assign(buildModel('summer', SUMMER_SEASON), {season: 'summer'}),
+  ];
   const items = {};
   for (const model of models) {
     for (const item of Object.values(model.byId)) {
@@ -83,10 +86,36 @@ export function uniqueConditions(days) {
   const seen = new Map();
   days.forEach((day) => {
     const t = clampTemp(day.t);
-    seen.set(`${t}|${day.rain ? 1 : 0}`, {t, rain: !!day.rain});
+    const season = day.season || DEFAULT_SEASON;
+    seen.set(`${season}|${t}|${day.rain ? 1 : 0}`, {t, rain: !!day.rain, season});
   });
   return [...seen.values()].sort((a, b) => a.t - b.t || Number(a.rain) - Number(b.rain));
 }
+
+/** Сезон по дате: декабрь–февраль зима, март–май весна, июнь–август лето, сентябрь–ноябрь осень. */
+export function seasonOf(date) {
+  const month = Number(String(date).slice(5, 7));
+  if (month === 12 || month <= 2) {
+    return 'winter';
+  }
+  if (month <= 5) {
+    return 'spring';
+  }
+  if (month <= 8) {
+    return 'summer';
+  }
+  return 'autumn';
+}
+
+export const SEASON_LABELS = {autumn: 'Осень', winter: 'Зима', spring: 'Весна', summer: 'Лето'};
+export const DEFAULT_SEASON = 'autumn';
+
+/**
+ * Из какого сезонного гардероба брать вещи. Вещь идёт в поездку, только если отмечена на этот сезон,
+ * дальше внутри сезона работает её диапазон температур. Весенних данных пока нет: весной берётся
+ * осенний гардероб (почти все осенние вещи отмечены и на весну).
+ */
+export const SEASON_MODELS = {autumn: ['autumn'], winter: ['winter'], spring: ['autumn'], summer: ['summer']};
 
 /**
  * Все образы, которые работают хотя бы при одном условии поездки и проходят проверку цвета.
@@ -98,6 +127,9 @@ export function tripOutfits(pool, conditions) {
     const {scale} = model;
     for (const outfit of model.outfits) {
       conditions.forEach((cond, index) => {
+        if (!SEASON_MODELS[cond.season || DEFAULT_SEASON].includes(model.season)) {
+          return;
+        }
         if (cond.t < scale.min || cond.t > scale.max) {
           return;
         }
@@ -475,7 +507,10 @@ export function planDays(pool, capsule, days) {
 
   return days.map((day, dayIndex) => {
     const travel = capsule.travelItems.length > 0 && (dayIndex === 0 || dayIndex === days.length - 1);
-    const condIndex = capsule.conditions.findIndex((c) => c.t === clampTemp(day.t) && c.rain === !!day.rain);
+    const season = day.season || DEFAULT_SEASON;
+    const condIndex = capsule.conditions.findIndex(
+      (c) => c.t === clampTemp(day.t) && c.rain === !!day.rain && c.season === season,
+    );
     const options = capsule.outfits.filter((outfit) => outfit.conds.has(condIndex));
     let best = null;
     let bestValue = -Infinity;
@@ -533,7 +568,7 @@ export function planDays(pool, capsule, days) {
 }
 
 /** Дни для режима без прогноза: температуры от tmax до tmin вперемешку (тёплый, прохладный, …), дождь каждый третий день. */
-export function manualDays({days, tmin, tmax, rain}) {
+export function manualDays({days, tmin, tmax, rain, season = DEFAULT_SEASON}) {
   const count = Math.max(1, Math.min(30, Math.round(days)));
   const lo = Math.min(tmin, tmax);
   const hi = Math.max(tmin, tmax);
@@ -545,5 +580,5 @@ export function manualDays({days, tmin, tmax, rain}) {
       order.push(spread[right]);
     }
   }
-  return order.map((t, i) => ({t: Math.round(t), rain: !!rain && i % 3 === 1}));
+  return order.map((t, i) => ({t: Math.round(t), rain: !!rain && i % 3 === 1, season}));
 }

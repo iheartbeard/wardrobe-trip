@@ -8,6 +8,7 @@ import {
   manualDays,
   planDays,
   uniqueConditions,
+  seasonOf,
 } from '../js/trip/capsule.js';
 import {evaluateColors} from '../js/lib/color.js';
 import {dateRange} from '../js/trip/forecast.js';
@@ -16,8 +17,8 @@ const pool = buildPool();
 
 const trips = {
   осень: {days: 7, tmin: 10, tmax: 18, rain: true},
-  зима: {days: 5, tmin: 2, tmax: 10, rain: true},
-  лето: {days: 10, tmin: 24, tmax: 30, rain: false},
+  зима: {days: 5, tmin: 2, tmax: 10, rain: true, season: 'winter'},
+  лето: {days: 10, tmin: 24, tmax: 30, rain: false, season: 'summer'},
   разброс: {days: 14, tmin: 8, tmax: 26, rain: true},
 };
 
@@ -28,15 +29,15 @@ test('ручные дни включают обе границы и не вых�
   assert.ok(temps.includes(10) && temps.includes(20));
   assert.ok(temps.every((t) => t >= 10 && t <= 20));
   assert.ok(days.some((d) => d.rain));
-  assert.deepEqual(manualDays({days: 1, tmin: 15, tmax: 15}), [{t: 15, rain: false}]);
+  assert.deepEqual(manualDays({days: 1, tmin: 15, tmax: 15}), [{t: 15, rain: false, season: 'autumn'}]);
 });
 
 test('условия поездки без повторов и в пределах гардероба', () => {
   const conds = uniqueConditions([{t: 40}, {t: 40}, {t: -10, rain: true}, {t: 12.4}]);
   assert.deepEqual(conds, [
-    {t: 0, rain: true},
-    {t: 12, rain: false},
-    {t: 32, rain: false},
+    {t: 0, rain: true, season: 'autumn'},
+    {t: 12, rain: false, season: 'autumn'},
+    {t: 32, rain: false, season: 'autumn'},
   ]);
 });
 
@@ -170,7 +171,7 @@ test('при замене верхнего слоя берутся только 
     assert.equal(capsule.outerShort, false);
     excluded.push(capsule.ids.find((id) => capsuleSlot(pool.items[id]) === 'o'));
   }
-  const tight = buildCapsule(pool, manualDays({days: 5, tmin: 2, tmax: 9}), {
+  const tight = buildCapsule(pool, manualDays({days: 5, tmin: 2, tmax: 9, season: 'winter'}), {
     luggage: 'carryon',
     excluded: ['rx', 'rxt'],
   });
@@ -180,4 +181,16 @@ test('при замене верхнего слоя берутся только 
 test('головные уборы добираются до лимита, если есть подходящие', () => {
   const capsule = buildCapsule(pool, manualDays({days: 7, tmin: 6, tmax: 14, rain: true}), {luggage: 'carryon'});
   assert.equal(capsule.ids.filter((id) => pool.items[id].slot === 'h').length, LUGGAGE.carryon.h);
+});
+
+test('сезон по датам: в ноябре зимние вещи не берутся, в декабре берутся', () => {
+  assert.equal(seasonOf('2026-11-20'), 'autumn');
+  assert.equal(seasonOf('2026-12-01'), 'winter');
+  assert.equal(seasonOf('2027-04-10'), 'spring');
+  assert.equal(seasonOf('2027-07-01'), 'summer');
+  const winterOnly = ['rx', 'rxt'];
+  const nov = buildCapsule(pool, manualDays({days: 5, tmin: 2, tmax: 9, season: 'autumn'}), {luggage: 'carryon'});
+  assert.ok(nov.outfits.every((outfit) => !winterOnly.includes(outfit.o)));
+  const dec = buildCapsule(pool, manualDays({days: 5, tmin: 0, tmax: 6, season: 'winter'}), {luggage: 'carryon'});
+  assert.ok(dec.outfits.some((outfit) => winterOnly.includes(outfit.o)));
 });
