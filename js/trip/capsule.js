@@ -152,6 +152,9 @@ export function buildCapsule(pool, days, options = {}) {
     limits[slot] = Math.max(limits[slot], pinnedCounts[slot]);
   });
   limits.t = Math.min(limits.t, Math.max(2, days.length, pinnedCounts.t));
+  /* Пара только для дороги входит в те же 2–3 пары, поэтому на ходьбу остаётся на одну меньше */
+  const travelItems = options.travelShoes ? TRAVEL_ONLY.filter((id) => pool.items[id]) : [];
+  limits.s = Math.max(1, limits.s - travelItems.length);
 
   /* Холодные дни определяют куртку и низ, жаркие лёгкие вещи, поэтому пробуем несколько порядков и берём лучший */
   const optionCount = conditions.map((_, index) => outfits.filter((o) => o.conds.has(index)).length);
@@ -358,12 +361,11 @@ export function buildCapsule(pool, days, options = {}) {
   );
   [...head, ...scarves].forEach((id) => chosen.add(id));
   const eventItems = options.event ? EVENT_ONLY.filter((id) => pool.items[id]) : [];
-  const travelItems = options.travelShoes ? TRAVEL_ONLY.filter((id) => pool.items[id]) : [];
 
   const finalCovered = coveredSet();
   return {
     conditions,
-    limits,
+    limits: {...limits, s: limits.s + travelItems.length},
     ids: [...chosen, ...eventItems, ...travelItems],
     eventItems,
     travelItems,

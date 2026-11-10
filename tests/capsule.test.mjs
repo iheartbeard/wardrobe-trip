@@ -124,3 +124,12 @@ test('Birkenstock Boston только на дни в дороге', () => {
   });
   assert.ok(!buildCapsule(pool, days).ids.includes('bos'));
 });
+
+test('пара для дороги входит в лимит обуви', () => {
+  for (const luggage of Object.keys(LUGGAGE)) {
+    const capsule = buildCapsule(pool, manualDays(trips.осень), {luggage, travelShoes: true});
+    const shoes = capsule.ids.filter((id) => capsuleSlot(pool.items[id]) === 's');
+    assert.ok(shoes.length <= LUGGAGE[luggage].s, `${luggage}: ${shoes.length}`);
+    assert.equal(capsule.limits.s, LUGGAGE[luggage].s);
+  }
+});

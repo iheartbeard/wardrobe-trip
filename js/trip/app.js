@@ -28,7 +28,7 @@ const defaults = () => {
     manual: {days: 7, tmin: 12, tmax: 20, rain: false},
     luggage: 'cabin',
     event: false,
-    travelShoes: false,
+    travelShoes: true,
     built: false,
     pinned: [],
     excluded: [],
@@ -322,7 +322,8 @@ function renderCapsule(capsule) {
         })
         .join('');
       const limit = capsule.limits[slot];
-      const daily = bySlot[slot].filter((item) => !extraTag(capsule, item.id)).length;
+      /* Пара для дороги считается в лимите обуви, пара под мероприятие идёт сверх него */
+      const daily = bySlot[slot].filter((item) => !capsule.eventItems.includes(item.id)).length;
       const extra = bySlot[slot].length - daily;
       const counter = limit
         ? ` <span class="cnt">${daily} из ${limit}${extra ? ` + ${extra} сверх лимита` : ''}</span>`
