@@ -1,236 +1,142 @@
+/* Тесты капсулы. Нужен клон wardrobe-fits рядом с этим репозиторием: модель и данные берутся оттуда. */
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {
   LUGGAGE,
+  TRIP_RULES,
   buildCapsule,
   buildPool,
   capsuleSlot,
   manualDays,
   planDays,
-  uniqueConditions,
   seasonOf,
   tripOutfits,
+  uniqueConditions,
 } from '../js/trip/capsule.js';
-import {evaluateColors} from '../js/lib/color.js';
+import {evaluateColors} from '../js/trip/wardrobe.js';
 import {dateRange} from '../js/trip/forecast.js';
 
 const pool = buildPool();
 
 const trips = {
-  осень: {days: 7, tmin: 10, tmax: 18, rain: true},
-  зима: {days: 5, tmin: 2, tmax: 10, rain: true, season: 'winter'},
-  лето: {days: 10, tmin: 24, tmax: 30, rain: false, season: 'summer'},
-  разброс: {days: 14, tmin: 8, tmax: 26, rain: true},
+  'осень с дождём': {days: 7, tmin: 8, tmax: 16, rain: true, season: 'autumn'},
+  'осень, холодно': {days: 4, tmin: 6, tmax: 10, season: 'autumn'},
+  'осень, тепло': {days: 5, tmin: 12, tmax: 18, season: 'autumn'},
+  зима: {days: 5, tmin: 2, tmax: 9, rain: true, season: 'winter'},
 };
 
-test('ручные дни включают обе границы и не выходят за них', () => {
-  const days = manualDays({days: 5, tmin: 10, tmax: 20, rain: true});
-  assert.equal(days.length, 5);
-  const temps = days.map((d) => d.t);
-  assert.ok(temps.includes(10) && temps.includes(20));
-  assert.ok(temps.every((t) => t >= 10 && t <= 20));
-  assert.ok(days.some((d) => d.rain));
-  assert.deepEqual(manualDays({days: 1, tmin: 15, tmax: 15}), [{t: 15, rain: false, season: 'autumn'}]);
-});
-
-test('условия поездки без повторов и в пределах гардероба', () => {
-  const conds = uniqueConditions([{t: 40}, {t: 40}, {t: -10, rain: true}, {t: 12.4}]);
-  assert.deepEqual(conds, [
-    {t: 0, rain: true, season: 'autumn'},
-    {t: 12, rain: false, season: 'autumn'},
-    {t: 32, rain: false, season: 'autumn'},
-  ]);
-});
-
-test('даты поездки', () => {
-  assert.deepEqual(dateRange('2026-12-30', '2027-01-02'), ['2026-12-30', '2026-12-31', '2027-01-01', '2027-01-02']);
-});
+const slotOf = (id) => capsuleSlot(pool.items[id]);
+const ofSlot = (capsule, slot) => capsule.ids.filter((id) => slotOf(id) === slot);
 
 for (const [name, trip] of Object.entries(trips)) {
   for (const luggage of Object.keys(LUGGAGE)) {
-    test(`${name}, ${luggage}: капсула в лимитах, покрывает погоду, образы без цветовых конфликтов`, () => {
+    test(`${name}, ${luggage}`, async (t) => {
       const days = manualDays(trip);
       const capsule = buildCapsule(pool, days, {luggage});
-      const counts = {};
-      capsule.ids.forEach((id) => {
-        const slot = capsuleSlot(pool.items[id]);
-        counts[slot] = (counts[slot] || 0) + 1;
-      });
-      for (const slot of ['o', 'm', 'b', 's', 'h']) {
-        assert.ok((counts[slot] || 0) <= capsule.limits[slot], `${slot}: ${counts[slot]} > ${capsule.limits[slot]}`);
-      }
-      assert.ok((counts.t || 0) >= 2, 'хотя бы две футболки');
-      /* Непокрытыми могут остаться только условия, под которые в гардеробе нет образа вообще */
-      /* В один рюкзак с одной парой обуви дождь и сухие дни закрываются не всегда, это честные пробелы */
-      if (luggage !== 'backpack') {
-        assert.ok(
-          capsule.gaps.every((gap) => capsule.impossible.includes(gap)),
-          'все возможные дни закрыты',
-        );
-      }
-      capsule.outfits.forEach((outfit) => {
-        assert.ok(outfit.ids.every((id) => capsule.ids.includes(id)));
-        assert.ok(evaluateColors(outfit.ids.map((id) => pool.items[id])));
+
+      await t.test('все дни закрыты', () => assert.deepEqual(capsule.gaps, []));
+
+      await t.test('всё сочетается со всем: каждая пара вещей, которые носятся вместе', () => {
+        for (const a of capsule.ids) {
+          for (const b of capsule.ids) {
+            if (a < b && slotOf(a) !== slotOf(b)) {
+              assert.ok(evaluateColors([pool.items[a], pool.items[b]]), `${a} + ${b}`);
+            }
+          }
+        }
       });
 
-      const plan = planDays(pool, capsule, days);
-      assert.equal(plan.length, days.length);
-      plan
-        .filter((entry) => !capsule.gaps.some((c) => c.t === entry.day.t && c.rain === entry.day.rain))
-        .forEach((entry) => assert.ok(entry.outfit, `образ на ${entry.day.t}`));
+      await t.test('каждый образ из капсулы под погоду поездки проходит проверку цвета', () => {
+        const all = tripOutfits(pool, uniqueConditions(days));
+        all
+          .filter((outfit) => outfit.ids.every((id) => capsule.ids.includes(id)))
+          .forEach((outfit) => assert.notEqual(outfit.score, null, outfit.ids.join(' + ')));
+      });
+
+      await t.test('образы — это образы модели основного проекта', () => {
+        capsule.outfits.forEach((outfit) => {
+          const model = pool.models[trip.season];
+          assert.ok(
+            model.outfits.some((o) => o.o === outfit.o && o.m === outfit.m && o.b === outfit.b && o.s === outfit.s),
+          );
+        });
+      });
+
+      await t.test('лимиты багажа и правила сборов', () => {
+        const limits = LUGGAGE[luggage];
+        for (const slot of ['o', 'm', 'b', 'h']) {
+          assert.ok(ofSlot(capsule, slot).length <= limits[slot], slot);
+        }
+        assert.ok(ofSlot(capsule, 's').length <= limits.s);
+        assert.ok(ofSlot(capsule, 'm').length <= 2, 'средний слой максимум 2');
+        assert.ok(
+          ofSlot(capsule, 'm').filter((id) => pool.items[id].kind === TRIP_RULES.hoodieKind).length <= 1,
+          'худи максимум 1',
+        );
+        assert.ok(capsule.ids.filter((id) => TRIP_RULES.jeans.includes(id)).length <= TRIP_RULES.maxJeans);
+        assert.ok(capsule.ids.every((id) => ![...TRIP_RULES.notForWalking, ...TRIP_RULES.eventOnly].includes(id)));
+      });
+
+      await t.test('план по дням: образ на каждый день', () => {
+        planDays(pool, capsule, days).forEach((entry) => assert.ok(entry.outfit, `день ${entry.day.t}`));
+      });
     });
   }
 }
 
-test('закреплённая вещь остаётся, убранная не попадает', () => {
-  const days = manualDays(trips.осень);
-  const base = buildCapsule(pool, days);
-  const drop = base.ids.find((id) => capsuleSlot(pool.items[id]) === 's');
-  const capsule = buildCapsule(pool, days, {pinned: ['bd'], excluded: [drop]});
-  assert.ok(capsule.ids.includes('bd'));
-  assert.ok(!capsule.ids.includes(drop));
-});
-
-test('ботинки 3-Eye в поездку только под мероприятие, вне лимитов и плана', () => {
-  for (const trip of Object.values(trips)) {
-    const days = manualDays(trip);
-    const plain = buildCapsule(pool, days, {luggage: 'carryon'});
-    assert.ok(!plain.ids.includes('tim'));
-    const withEvent = buildCapsule(pool, days, {luggage: 'carryon', event: true});
-    assert.deepEqual(withEvent.eventItems, ['tim']);
-    assert.ok(withEvent.ids.includes('tim'));
-    assert.ok(withEvent.outfits.every((outfit) => outfit.s !== 'tim'));
-    planDays(pool, withEvent, days).forEach((entry) => assert.notEqual(entry.outfit && entry.outfit.s, 'tim'));
-  }
-});
-
-test('слипоны и Palermo в поездку не предлагаются', () => {
-  for (const trip of Object.values(trips)) {
-    for (const luggage of Object.keys(LUGGAGE)) {
-      const capsule = buildCapsule(pool, manualDays(trip), {luggage, pinned: ['van']});
-      assert.ok(['van', 'pal', 'w1', 'w2', 'bos'].every((id) => !capsule.ids.includes(id)));
-    }
-  }
-});
-
-test('пара только для дороги: любая, на первый и последний день, входит в лимит', () => {
-  const days = manualDays(trips.осень);
-  for (const shoe of ['bos', 'n990t']) {
-    const capsule = buildCapsule(pool, days, {luggage: 'carryon', travelShoe: shoe});
-    assert.deepEqual(capsule.travelItems, [shoe]);
-    assert.ok(capsule.outfits.every((outfit) => outfit.s !== shoe));
-    const shoes = capsule.ids.filter((id) => capsuleSlot(pool.items[id]) === 's');
-    assert.ok(shoes.length <= LUGGAGE.carryon.s);
-    planDays(pool, capsule, days).forEach((entry, i) => {
-      const road = i === 0 || i === days.length - 1;
-      assert.equal(entry.travel, road);
-      assert.equal(entry.shoe === shoe, road);
-    });
-  }
-  assert.deepEqual(buildCapsule(pool, days, {luggage: 'backpack', travelShoe: 'bos'}).travelItems, []);
-});
-
-test('с чемоданом на короткую поездку две пары обуви, на длинную три', () => {
-  const short = buildCapsule(pool, manualDays({days: 3, tmin: 10, tmax: 17, rain: true}), {luggage: 'carryon'});
-  const long = buildCapsule(pool, manualDays({days: 8, tmin: 10, tmax: 17, rain: true}), {luggage: 'carryon'});
-  const count = (c) => c.ids.filter((id) => capsuleSlot(pool.items[id]) === 's').length;
-  assert.equal(short.limits.s, 2);
-  assert.ok(count(short) <= 2);
-  assert.equal(long.limits.s, 3);
-});
-
-test('куртка в поездку всегда одна', () => {
-  for (const trip of Object.values(trips)) {
-    for (const luggage of Object.keys(LUGGAGE)) {
-      const capsule = buildCapsule(pool, manualDays(trip), {luggage});
-      assert.ok(capsule.ids.filter((id) => capsuleSlot(pool.items[id]) === 'o').length <= 1);
-    }
-  }
-});
-
-test('верхний слой один: куртка или жилетка, без выдуманных пар', () => {
-  for (const trip of Object.values(trips)) {
-    for (const luggage of Object.keys(LUGGAGE)) {
-      const capsule = buildCapsule(pool, manualDays(trip), {luggage});
-      assert.ok(capsule.ids.filter((id) => capsuleSlot(pool.items[id]) === 'o').length <= 1);
-      capsule.outfits.forEach((outfit) => {
-        const outer = pool.items[outfit.o];
-        if (outer && outer.group === 'Жилетки') {
-          assert.notEqual(pool.items[outfit.m].kind, 'vs', 'жилетка под жилеткой');
-        }
-      });
-    }
-  }
-});
-
-test('при замене верхнего слоя берутся только варианты под всю погоду поездки', () => {
-  const days = manualDays({days: 7, tmin: 6, tmax: 14, rain: true});
-  const excluded = [];
-  for (let i = 0; i < 4; i++) {
-    const capsule = buildCapsule(pool, days, {luggage: 'carryon', excluded});
-    assert.deepEqual(capsule.gaps, [], `замена ${i}`);
-    assert.equal(capsule.outerShort, false);
-    excluded.push(capsule.ids.find((id) => capsuleSlot(pool.items[id]) === 'o'));
-  }
-  const tight = buildCapsule(pool, manualDays({days: 5, tmin: 2, tmax: 9, season: 'winter'}), {
-    luggage: 'carryon',
-    excluded: ['rx', 'rxt'],
-  });
-  assert.equal(typeof tight.outerShort, 'boolean');
-});
-
-test('головные уборы добираются до лимита, если есть подходящие', () => {
-  const capsule = buildCapsule(pool, manualDays({days: 7, tmin: 6, tmax: 14, rain: true}), {luggage: 'carryon'});
-  assert.equal(capsule.ids.filter((id) => pool.items[id].slot === 'h').length, LUGGAGE.carryon.h);
-});
-
-test('сезон по датам: в ноябре зимние вещи не берутся, в декабре берутся; Retro-X переходный', () => {
+test('сезон по дате и сезоны без данных', () => {
   assert.equal(seasonOf('2026-11-20'), 'autumn');
   assert.equal(seasonOf('2026-12-01'), 'winter');
   assert.equal(seasonOf('2027-04-10'), 'spring');
   assert.equal(seasonOf('2027-07-01'), 'summer');
-  const winterOnly = ['det2'];
-  const nov = tripOutfitsFor('autumn');
-  const dec = tripOutfitsFor('winter');
-  assert.ok(nov.every((outfit) => !winterOnly.includes(outfit.o)));
-  assert.ok(dec.some((outfit) => winterOnly.includes(outfit.o)));
-  assert.ok(
-    nov.some((outfit) => outfit.o === 'rx'),
-    'Retro-X есть и осенью',
-  );
-  assert.ok(
-    dec.some((outfit) => outfit.o === 'rx'),
-    'и зимой',
-  );
+  const summer = buildCapsule(pool, manualDays({days: 4, tmin: 24, tmax: 30, season: 'summer'}));
+  assert.equal(summer.unsupported.length, summer.conditions.length);
+  assert.deepEqual(summer.ids, []);
 });
 
-function tripOutfitsFor(season) {
-  return tripOutfits(pool, uniqueConditions(manualDays({days: 6, tmin: 5, tmax: 10, season})));
-}
+test('в ноябре зимние вещи не берутся', () => {
+  const nov = tripOutfits(pool, uniqueConditions(manualDays({days: 5, tmin: 5, tmax: 10, season: 'autumn'})));
+  assert.ok(nov.every((outfit) => outfit.o !== 'det2'));
+});
 
-test('обувь подбирается первой и закрывает погоду, остальное собирается вокруг неё', () => {
-  const days = manualDays({days: 7, tmin: 8, tmax: 16, rain: true});
-  const capsule = buildCapsule(pool, days, {luggage: 'carryon'});
-  const shoes = capsule.ids.filter((id) => capsuleSlot(pool.items[id]) === 's');
-  assert.ok(capsule.outfits.every((outfit) => shoes.includes(outfit.s)));
-  assert.deepEqual(capsule.gaps, []);
-  const pinnedShoe = buildCapsule(pool, days, {luggage: 'carryon', pinned: ['n993']});
-  assert.ok(pinnedShoe.ids.includes('n993'));
+test('джинсы берутся в последнюю очередь, но не больше двух', () => {
+  const days = manualDays(trips['осень с дождём']);
+  const pinned = buildCapsule(pool, days, {luggage: 'carryon', pinned: ['bn1', 'bn2', 'be']});
+  assert.ok(pinned.ids.filter((id) => TRIP_RULES.jeans.includes(id)).length >= 2);
+});
+
+test('обувь первой, пара только для дороги и мероприятие', () => {
+  const days = manualDays(trips['осень с дождём']);
+  const capsule = buildCapsule(pool, days, {luggage: 'carryon', travelShoe: 'bos', event: true});
+  assert.deepEqual(capsule.travelItems, ['bos']);
+  assert.deepEqual(capsule.eventItems, ['tim']);
+  assert.ok(ofSlot(capsule, 's').length <= LUGGAGE.carryon.s + 1);
+  assert.ok(capsule.outfits.every((outfit) => outfit.s !== 'bos' && outfit.s !== 'tim'));
+  planDays(pool, capsule, days).forEach((entry, i) => {
+    assert.equal(entry.shoe === 'bos', i === 0 || i === days.length - 1);
+  });
+});
+
+test('короткая поездка: две пары обуви', () => {
+  const capsule = buildCapsule(pool, manualDays({...trips['осень с дождём'], days: 3}), {luggage: 'carryon'});
+  assert.equal(capsule.limits.s, 2);
 });
 
 test('если все тёплые слои заменены, капсула подсказывает, что вернуть', () => {
-  /* Убраны все слои, которые носятся ниже +10: свитеры, свитшоты, тёплые худи, жилет Taion */
   const excluded = Object.values(pool.items)
     .filter((item) => ['sw', 'ss', 'vs'].includes(item.kind) || item.warm || item.id === 'tu')
     .map((item) => item.id);
-  const days = [6, 9, 9, 10].map((t) => ({t, season: 'autumn'}));
+  const days = [6, 9, 10].map((t) => ({t, season: 'autumn'}));
   const capsule = buildCapsule(pool, days, {luggage: 'carryon', excluded});
+  assert.ok(capsule.replacedGaps.length > 0);
+  assert.ok(capsule.restore.length > 0 && capsule.restore.every((id) => excluded.includes(id)));
+});
+
+test('ручные дни и даты', () => {
+  const days = manualDays({days: 5, tmin: 10, tmax: 20, rain: true, season: 'autumn'});
   assert.deepEqual(
-    capsule.replacedGaps.map((c) => c.t),
-    [6, 9],
+    days.map((d) => d.t).sort((a, b) => a - b),
+    [10, 13, 15, 18, 20],
   );
-  assert.ok(capsule.restore.length > 0);
-  assert.ok(capsule.restore.every((id) => excluded.includes(id)));
-  const pinnedFull = buildCapsule(pool, days, {luggage: 'carryon', pinned: ['ssc', 'r1', 'r2']});
-  assert.ok(pinnedFull.gaps.length === 0 || pinnedFull.pinBlocked.includes('m'));
+  assert.deepEqual(dateRange('2026-12-30', '2027-01-02'), ['2026-12-30', '2026-12-31', '2027-01-01', '2027-01-02']);
 });

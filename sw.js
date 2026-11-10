@@ -1,30 +1,32 @@
 /* Service worker капсулы: страница поездки работает без сети. Общие модули берутся из корня сайта. */
-const CACHE_VERSION = 'kapsula-v29';
+const CACHE_VERSION = 'kapsula-v30';
 
 const APP_FILES = [
   './',
   'index.html',
   'manifest.webmanifest',
   'css/trip.css',
-  'css/styles.css',
   'js/trip/app.js',
   'js/trip/capsule.js',
   'js/trip/forecast.js',
-  'js/trip/summer.js',
-  'js/model.js',
-  'js/config.js',
-  'js/ui/templates.js',
-  'js/lib/color.js',
-  'js/lib/temperature.js',
-  'js/data/autumn.js',
-  'js/data/winter.js',
-  'js/data/looks.js',
-  'js/data/seasons.js',
-  'js/data/wada.js',
+  'js/trip/rules.js',
+  'js/trip/wardrobe.js',
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/maskable-512.png',
   'icons/apple-touch-icon.png',
+  /* Гардероб основного проекта: та же модель и данные, что на основной странице */
+  '../wardrobe-fits/css/styles.css',
+  '../wardrobe-fits/js/model.js',
+  '../wardrobe-fits/js/config.js',
+  '../wardrobe-fits/js/ui/templates.js',
+  '../wardrobe-fits/js/lib/color.js',
+  '../wardrobe-fits/js/lib/temperature.js',
+  '../wardrobe-fits/js/data/seasons.js',
+  '../wardrobe-fits/js/data/autumn.js',
+  '../wardrobe-fits/js/data/winter.js',
+  '../wardrobe-fits/js/data/looks.js',
+  '../wardrobe-fits/js/data/wada.js',
 ];
 
 const FONT_HOST = /fonts\.(googleapis|gstatic)\.com$/;

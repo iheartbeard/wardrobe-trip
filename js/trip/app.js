@@ -3,8 +3,7 @@
  * план по дням и чек-лист сборов. Состояние хранится в localStorage, поэтому собранная капсула
  * открывается и без сети.
  */
-import {esc} from '../ui/templates.js';
-import {formatTemp} from '../lib/temperature.js';
+import {esc, formatTemp} from './wardrobe.js';
 import {
   DEFAULT_LUGGAGE,
   LUGGAGE,
@@ -326,7 +325,7 @@ function rebuild() {
       excluded: state.excluded,
     });
     const plan = planDays(pool, capsule, days);
-    state.packed = state.packed.filter((id) => id.startsWith('x:') || capsule.ids.includes(id));
+    state.packed = state.packed.filter((id) => capsule.ids.includes(id));
     state.built = true;
     save();
     renderResult(capsule, plan, days);
@@ -377,14 +376,19 @@ function renderStats(capsule, days) {
     : '<p class="note">Погода задана вручную: температуры разложены по дням от тёплых к прохладным.</p>';
 
   const lines = [];
-  if (days.some((day) => day.season === 'spring')) {
-    lines.push('Весенних вещей в гардеробе пока нет: на весенние дни берутся вещи, отмеченные на осень.');
+  if (capsule.unsupported.length) {
+    const seasons = [...new Set(capsule.unsupported.map((c) => SEASON_LABELS[c.season]))].join(' и ');
+    lines.push(
+      `Сезона «${seasons}» в основном гардеробе пока нет, поэтому на эти дни капсулу не собрать. Он появится здесь, когда его заведут там.`,
+    );
   }
   const name = (c) => `${formatTemp(c.t)}${c.rain ? ' в дождь' : ''}`;
   if (capsule.impossible.length) {
     lines.push(`Для ${capsule.impossible.map(name).join(', ')} в гардеробе нет подходящего образа.`);
   }
-  const tight = capsule.gaps.filter((g) => !capsule.impossible.includes(g) && !capsule.replacedGaps.includes(g));
+  const tight = capsule.gaps.filter(
+    (g) => !capsule.impossible.includes(g) && !capsule.replacedGaps.includes(g) && !capsule.unsupported.includes(g),
+  );
   let restoreHtml = '';
   if (capsule.replacedGaps.length) {
     lines.push(`Для ${capsule.replacedGaps.map(name).join(', ')} всё подходящее заменено. Верни одну из этих вещей:`);
@@ -404,7 +408,9 @@ function renderStats(capsule, days) {
       'Курток и жилеток, которые подходят под всю погоду поездки, больше не осталось. Верни одну из заменённых.',
     );
   } else if (tight.length) {
-    lines.push(`Для ${tight.map(name).join(', ')} образ не уместился в лимит багажа, попробуй добавить чемодан.`);
+    lines.push(
+      `Для ${tight.map(name).join(', ')} не получилось собрать образ, который сочетается со всей капсулой и влезает в багаж. Попробуй добавить чемодан или заменить вещь.`,
+    );
   }
   $('gaps').hidden = !lines.length;
   $('gaps').innerHTML = esc(lines.join(' ')) + (restoreHtml ? `<span class="chips restore">${restoreHtml}</span>` : '');
@@ -492,12 +498,8 @@ function renderPlan(plan) {
     .join('');
 }
 
-/**
- * Чек-лист по местам: что надеть в дорогу, что в рюкзак, что в чемодан.
- * Small куб с бельём и носками едет в рюкзаке, футболки и средний слой в Medium кубе.
- */
+/** Чек-лист: что надеть в дорогу и что уложить. Только вещи из капсулы. */
 function packSections(capsule) {
-  const days = lastPlan.length;
   const wearIds = [];
   const first = lastPlan[0];
   if (first && first.outfit) {
@@ -522,54 +524,26 @@ function packSections(capsule) {
   const rest = SLOT_ORDER.flatMap((slot) =>
     capsule.ids.filter((id) => capsuleSlot(pool.items[id]) === slot && !wearIds.includes(id)),
   );
-  const cube = rest.filter((id) => ['t', 'm'].includes(capsuleSlot(pool.items[id])));
-  const loose = rest.filter((id) => !cube.includes(id));
-  const underwear = Math.min(days || 1, 7);
-  const basics = [
-    {id: 'x:tech', text: 'Техника и зарядки'},
-    {id: 'x:wash', text: 'Туалетный набор'},
-    {id: 'x:under', text: `Small куб: трусы и носки × ${underwear}`},
-  ];
-  const {backpack, suitcase} = state.bags;
-  let sections;
-  if (backpack && suitcase) {
-    sections = [
-      {title: 'Рюкзак', items: basics},
-      {title: 'Чемодан: Medium куб', items: cube},
-      {title: 'Чемодан: остальное', items: loose},
-    ];
-  } else if (suitcase) {
-    sections = [
-      {title: 'Чемодан: техника и мелочи', items: basics},
-      {title: 'Чемодан: Medium куб', items: cube},
-      {title: 'Чемодан: остальное', items: loose},
-    ];
-  } else {
-    sections = [{title: 'Рюкзак', items: [...basics, ...cube, ...loose]}];
-  }
-  return [{title: 'На себе в дорогу', items: wearIds}, ...sections].filter((section) => section.items.length);
+  return [
+    {title: 'На себе в дорогу', items: wearIds},
+    {title: 'Уложить', items: rest},
+  ].filter((section) => section.items.length);
 }
 
 function renderPack(capsule) {
   const wear = travelWear(capsule);
   const sections = packSections(capsule);
-  const row = (entry) => {
-    const id = typeof entry === 'string' ? entry : entry.id;
+  const row = (id) => {
     const done = state.packed.includes(id);
-    let body;
-    if (typeof entry === 'string') {
-      const item = pool.items[id];
-      const tag = extraTag(capsule, id);
-      body = `${miniDot(item)}<span>${esc(item.name)} <em>${esc(item.colorName)}</em>${tag ? ` <span class="tg">${tag}</span>` : ''}</span>`;
-    } else {
-      body = `<i class="cd nc"></i><span>${esc(entry.text)}</span>`;
-    }
+    const item = pool.items[id];
+    const tag = extraTag(capsule, id);
+    const body = `${miniDot(item)}<span>${esc(item.name)} <em>${esc(item.colorName)}</em>${tag ? ` <span class="tg">${tag}</span>` : ''}</span>`;
     return `<li><label class="${done ? 'done' : ''}"><input type="checkbox" data-pack="${esc(id)}"${done ? ' checked' : ''} />${body}</label></li>`;
   };
   $('pack').innerHTML = sections
     .map((section) => `<li class="pack-h">${esc(section.title)}</li>${section.items.map(row).join('')}`)
     .join('');
-  const all = sections.flatMap((section) => section.items.map((e) => (typeof e === 'string' ? e : e.id)));
+  const all = sections.flatMap((section) => section.items);
   const left = all.filter((id) => !state.packed.includes(id)).length;
   $('pack-hint').textContent = left ? `Осталось уложить: ${left}. Отметки сохраняются на телефоне.` : 'Всё уложено.';
   return wear;
