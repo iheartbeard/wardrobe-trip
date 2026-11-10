@@ -384,7 +384,7 @@ function renderPlan(plan) {
 }
 
 /**
- * Чек-лист по местам: что надеть в дорогу, что в рюкзак CPP2, что в чемодан Xiaomi 20".
+ * Чек-лист по местам: что надеть в дорогу, что в рюкзак, что в чемодан.
  * Small куб с бельём и носками едет в рюкзаке, футболки и средний слой в Medium кубе.
  */
 function packSections(capsule) {
@@ -418,18 +418,18 @@ function packSections(capsule) {
   const underwear = Math.min(days || 1, 7);
   const basics = [
     {id: 'x:tech', text: 'Техника и зарядки'},
-    {id: 'x:wash', text: 'Wash Pouch'},
+    {id: 'x:wash', text: 'Туалетный набор'},
     {id: 'x:under', text: `Small куб: трусы и носки × ${underwear}`},
   ];
   const onlyBackpack = state.luggage === 'backpack';
   return [
     {title: 'На себе в дорогу', items: wearIds},
-    {title: 'Рюкзак CPP2', items: onlyBackpack ? [...basics, ...cube, ...loose] : basics},
+    {title: 'Рюкзак', items: onlyBackpack ? [...basics, ...cube, ...loose] : basics},
     ...(onlyBackpack
       ? []
       : [
-          {title: 'Xiaomi: Medium куб', items: cube},
-          {title: 'Xiaomi: остальное', items: loose},
+          {title: 'Чемодан: Medium куб', items: cube},
+          {title: 'Чемодан: остальное', items: loose},
         ]),
   ].filter((section) => section.items.length);
 }
