@@ -9,6 +9,7 @@ import {
   planDays,
   uniqueConditions,
   seasonOf,
+  tripOutfits,
 } from '../js/trip/capsule.js';
 import {evaluateColors} from '../js/lib/color.js';
 import {dateRange} from '../js/trip/forecast.js';
@@ -183,14 +184,26 @@ test('головные уборы добираются до лимита, есл
   assert.equal(capsule.ids.filter((id) => pool.items[id].slot === 'h').length, LUGGAGE.carryon.h);
 });
 
-test('сезон по датам: в ноябре зимние вещи не берутся, в декабре берутся', () => {
+test('сезон по датам: в ноябре зимние вещи не берутся, в декабре берутся; Retro-X переходный', () => {
   assert.equal(seasonOf('2026-11-20'), 'autumn');
   assert.equal(seasonOf('2026-12-01'), 'winter');
   assert.equal(seasonOf('2027-04-10'), 'spring');
   assert.equal(seasonOf('2027-07-01'), 'summer');
-  const winterOnly = ['rx', 'rxt'];
-  const nov = buildCapsule(pool, manualDays({days: 5, tmin: 2, tmax: 9, season: 'autumn'}), {luggage: 'carryon'});
-  assert.ok(nov.outfits.every((outfit) => !winterOnly.includes(outfit.o)));
-  const dec = buildCapsule(pool, manualDays({days: 5, tmin: 0, tmax: 6, season: 'winter'}), {luggage: 'carryon'});
-  assert.ok(dec.outfits.some((outfit) => winterOnly.includes(outfit.o)));
+  const winterOnly = ['det2'];
+  const nov = tripOutfitsFor('autumn');
+  const dec = tripOutfitsFor('winter');
+  assert.ok(nov.every((outfit) => !winterOnly.includes(outfit.o)));
+  assert.ok(dec.some((outfit) => winterOnly.includes(outfit.o)));
+  assert.ok(
+    nov.some((outfit) => outfit.o === 'rx'),
+    'Retro-X есть и осенью',
+  );
+  assert.ok(
+    dec.some((outfit) => outfit.o === 'rx'),
+    'и зимой',
+  );
 });
+
+function tripOutfitsFor(season) {
+  return tripOutfits(pool, uniqueConditions(manualDays({days: 6, tmin: 5, tmax: 10, season})));
+}
