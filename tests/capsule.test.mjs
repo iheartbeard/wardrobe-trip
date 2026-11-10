@@ -146,7 +146,7 @@ test('куртка в поездку всегда одна', () => {
   }
 });
 
-test('к куртке можно взять жилетку, если сочетаются, в том числе с рюкзаком', () => {
+test('одна куртка и до одной жилетки, в том числе с рюкзаком', () => {
   let withVest = 0;
   for (const trip of Object.values(trips)) {
     for (const luggage of Object.keys(LUGGAGE)) {
@@ -154,7 +154,7 @@ test('к куртке можно взять жилетку, если сочет�
       const jackets = capsule.ids.filter((id) => capsuleSlot(pool.items[id]) === 'o');
       const vests = capsule.ids.filter((id) => capsuleSlot(pool.items[id]) === 'v');
       assert.ok(vests.length <= LUGGAGE[luggage].v);
-      jackets.forEach((j) => vests.forEach((v) => assert.ok(evaluateColors([pool.items[j], pool.items[v]]))));
+      assert.ok(jackets.length <= 1);
       withVest += vests.length;
     }
   }
@@ -164,4 +164,10 @@ test('к куртке можно взять жилетку, если сочет�
 test('с одним рюкзаком жилетка тоже может попасть в капсулу', () => {
   const capsule = buildCapsule(pool, manualDays({days: 5, tmin: 10, tmax: 15}), {luggage: 'backpack'});
   assert.equal(capsule.limits.v, 1);
+});
+
+test('жилетки по правилам основного гардероба: верхним слоем без куртки, Taion под курткой', () => {
+  const capsule = buildCapsule(pool, manualDays({days: 7, tmin: 8, tmax: 16}), {luggage: 'carryon'});
+  const vestOutfits = capsule.outfits.filter((outfit) => capsuleSlot(pool.items[outfit.o] || {}) === 'v');
+  vestOutfits.forEach((outfit) => assert.notEqual(pool.items[outfit.m].kind, 'vs', 'жилетка под жилеткой'));
 });

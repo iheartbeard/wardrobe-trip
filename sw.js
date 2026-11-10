@@ -1,5 +1,5 @@
 /* Service worker капсулы: страница поездки работает без сети. Общие модули берутся из корня сайта. */
-const CACHE_VERSION = 'kapsula-v19';
+const CACHE_VERSION = 'kapsula-v20';
 
 const APP_FILES = [
   './',

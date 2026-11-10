@@ -15,7 +15,9 @@ import {SUMMER_SEASON} from './summer.js';
  * поэтому одежды немного и одна пара обуви, та, что на ногах.
  * Рюкзак + маленький чемодан для ручной клади (~38 л): одежда едет в чемодане, рюкзак под технику.
  * Куртка всегда одна, та, в которой едешь: несколько курток в поездку не берутся.
- * К ней можно взять жилетку, если они сочетаются по цвету (и с рюкзаком: тёплое худи + жилетка).
+ * К ней можно взять одну жилетку, и с рюкзаком тоже. Жилетки работают по правилам основного гардероба
+ * (общая модель): жилетка носится как верхний слой вместо куртки, поверх лёгкого слоя или тёплого худи,
+ * в своём диапазоне температур; Taion ещё и средним слоем под курткой, но не под другой жилеткой.
  */
 export const LUGGAGE = {
   backpack: {label: 'Рюкзак', o: 1, v: 1, m: 2, t: 3, b: 2, s: 1, h: 1},
@@ -82,8 +84,6 @@ export const capsuleSlot = (item) => {
   }
   return item.slot;
 };
-
-const OUTER_SLOTS = ['o', 'v'];
 
 const clampTemp = (t) => Math.max(TRIP_LIMITS[0], Math.min(TRIP_LIMITS[1], Math.round(t)));
 
@@ -241,16 +241,6 @@ export function buildCapsule(pool, days, options = {}) {
         extra[slot] = (extra[slot] || 0) + 1;
         if (counts[slot] + extra[slot] > limits[slot]) {
           return false;
-        }
-        /* Куртка и жилетка берутся вместе, только если сочетаются друг с другом */
-        if (OUTER_SLOTS.includes(slot)) {
-          const others = [...chosen, ...ids].filter((other) => {
-            const otherSlot = capsuleSlot(pool.items[other]);
-            return other !== id && OUTER_SLOTS.includes(otherSlot) && otherSlot !== slot;
-          });
-          if (others.some((other) => !evaluateColors([pool.items[other], pool.items[id]]))) {
-            return false;
-          }
         }
       }
       return true;
