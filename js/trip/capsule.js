@@ -406,6 +406,27 @@ export function buildCapsule(pool, days, options = {}) {
         }
       });
     }
+    /* Если место ещё есть, добираем до лимита для разнообразия: подходит по погоде хотя бы в часть дней и по цвету */
+    while (result.length < limit) {
+      let best = null;
+      let bestValue = 0;
+      candidates.forEach((item) => {
+        if (result.includes(item.id)) {
+          return;
+        }
+        const hits = needed.filter((t) => inRange(item, t)).length;
+        const fit = accessoryFit(item);
+        const value = hits && fit > 0 ? hits / needed.length + fit * 2 : 0;
+        if (value > bestValue) {
+          bestValue = value;
+          best = item;
+        }
+      });
+      if (!best) {
+        break;
+      }
+      result.push(best.id);
+    }
     return result;
   };
   const head = pickAccessories('h', limits.h, temps);

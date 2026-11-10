@@ -176,3 +176,8 @@ test('при замене верхнего слоя берутся только 
   });
   assert.equal(typeof tight.outerShort, 'boolean');
 });
+
+test('головные уборы добираются до лимита, если есть подходящие', () => {
+  const capsule = buildCapsule(pool, manualDays({days: 7, tmin: 6, tmax: 14, rain: true}), {luggage: 'carryon'});
+  assert.equal(capsule.ids.filter((id) => pool.items[id].slot === 'h').length, LUGGAGE.carryon.h);
+});
