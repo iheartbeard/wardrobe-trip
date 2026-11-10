@@ -13,11 +13,12 @@ import {SUMMER_SEASON} from './summer.js';
  * Лимиты вещей под реальный багаж. Вещи, в которых едешь, тоже считаются.
  * Только Aer City Pack Pro 2 (24 л): большую часть места занимают техника, Wash Pouch и куб с бельём,
  * поэтому одежды немного и одна пара обуви, та, что на ногах.
- * CPP2 + кабинный Xiaomi S (22"): одежда едет в чемодане, рюкзак под технику.
+ * CPP2 + кабинный Xiaomi Luggage Classic 20" (38 л): одежда едет в чемодане, рюкзак под технику.
+ * В 38 л с двумя парами обуви и второй курткой помещается три средних слоя, четвёртый уже не влезает.
  */
 export const LUGGAGE = {
   backpack: {label: 'Только CPP2', o: 1, m: 2, t: 3, b: 2, s: 1, h: 1},
-  carryon: {label: 'CPP2 + Xiaomi S', o: 2, m: 4, t: 7, b: 3, s: 3, h: 2},
+  carryon: {label: 'CPP2 + Xiaomi 20"', o: 2, m: 3, t: 7, b: 3, s: 3, h: 2},
 };
 
 export const DEFAULT_LUGGAGE = 'carryon';

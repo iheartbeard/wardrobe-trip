@@ -384,7 +384,7 @@ function renderPlan(plan) {
 }
 
 /**
- * Чек-лист по местам: что надеть в дорогу, что в рюкзак CPP2, что в чемодан Xiaomi S.
+ * Чек-лист по местам: что надеть в дорогу, что в рюкзак CPP2, что в чемодан Xiaomi 20".
  * Small куб с бельём и носками едет в рюкзаке, футболки и средний слой в Medium кубе.
  */
 function packSections(capsule) {
@@ -428,8 +428,8 @@ function packSections(capsule) {
     ...(onlyBackpack
       ? []
       : [
-          {title: 'Xiaomi S: Medium куб', items: cube},
-          {title: 'Xiaomi S: остальное', items: loose},
+          {title: 'Xiaomi: Medium куб', items: cube},
+          {title: 'Xiaomi: остальное', items: loose},
         ]),
   ].filter((section) => section.items.length);
 }
