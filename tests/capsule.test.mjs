@@ -137,11 +137,3 @@ test('с чемоданом на короткую поездку две пары
   assert.equal(long.limits.s, 3);
 });
 
-test('обувь с чемоданом: две пары на короткую поездку, три на длинную', () => {
-  const short = buildCapsule(pool, manualDays({days: 4, tmin: 10, tmax: 17, rain: true}), {luggage: 'carryon'});
-  const long = buildCapsule(pool, manualDays({days: 8, tmin: 10, tmax: 17, rain: true}), {luggage: 'carryon'});
-  assert.equal(short.limits.s, 2);
-  assert.equal(long.limits.s, 3);
-  const count = (c) => c.ids.filter((id) => capsuleSlot(pool.items[id]) === 's').length;
-  assert.ok(count(short) <= 2 && count(long) <= 3);
-});
