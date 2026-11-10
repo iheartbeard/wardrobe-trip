@@ -146,7 +146,7 @@ test('куртка в поездку всегда одна', () => {
   }
 });
 
-test('к куртке можно взять жилетку, если сочетаются; с рюкзаком без жилетки', () => {
+test('к куртке можно взять жилетку, если сочетаются, в том числе с рюкзаком', () => {
   let withVest = 0;
   for (const trip of Object.values(trips)) {
     for (const luggage of Object.keys(LUGGAGE)) {
@@ -159,4 +159,9 @@ test('к куртке можно взять жилетку, если сочет�
     }
   }
   assert.ok(withVest > 0, 'жилетка хоть где-то берётся');
+});
+
+test('с одним рюкзаком жилетка тоже может попасть в капсулу', () => {
+  const capsule = buildCapsule(pool, manualDays({days: 5, tmin: 10, tmax: 15}), {luggage: 'backpack'});
+  assert.equal(capsule.limits.v, 1);
 });
