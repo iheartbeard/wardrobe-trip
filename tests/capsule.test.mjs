@@ -207,3 +207,13 @@ test('сезон по датам: в ноябре зимние вещи не б�
 function tripOutfitsFor(season) {
   return tripOutfits(pool, uniqueConditions(manualDays({days: 6, tmin: 5, tmax: 10, season})));
 }
+
+test('обувь подбирается первой и закрывает погоду, остальное собирается вокруг неё', () => {
+  const days = manualDays({days: 7, tmin: 8, tmax: 16, rain: true});
+  const capsule = buildCapsule(pool, days, {luggage: 'carryon'});
+  const shoes = capsule.ids.filter((id) => capsuleSlot(pool.items[id]) === 's');
+  assert.ok(capsule.outfits.every((outfit) => shoes.includes(outfit.s)));
+  assert.deepEqual(capsule.gaps, []);
+  const pinnedShoe = buildCapsule(pool, days, {luggage: 'carryon', pinned: ['n993']});
+  assert.ok(pinnedShoe.ids.includes('n993'));
+});

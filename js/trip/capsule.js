@@ -189,6 +189,44 @@ export function weatherFitOuter(outfits, conditions) {
 }
 
 /**
+ * Обувь подбирается первой. Жадно: сначала пары, которые закрывают больше всего ещё не закрытых дней,
+ * при равенстве та, с которой больше сочетаний без цветовых конфликтов. Закреплённые пары берутся всегда.
+ */
+export function pickShoes(outfits, conditions, limit, pinned, pool) {
+  const byShoe = {};
+  outfits.forEach((outfit) => {
+    const entry = (byShoe[outfit.s] = byShoe[outfit.s] || {conds: new Set(), combos: 0, score: 0});
+    outfit.conds.forEach((c) => entry.conds.add(c));
+    entry.combos += 1;
+    entry.score += outfit.score;
+  });
+  const chosen = pinned.filter((id) => pool.items[id] && pool.items[id].slot === 's');
+  const covered = new Set();
+  chosen.forEach((id) => (byShoe[id] ? byShoe[id].conds : []).forEach((c) => covered.add(c)));
+  while (chosen.length < limit) {
+    let best = null;
+    let bestValue = 0;
+    Object.entries(byShoe).forEach(([id, entry]) => {
+      if (chosen.includes(id)) {
+        return;
+      }
+      const opens = [...entry.conds].filter((c) => !covered.has(c)).length;
+      const value = opens * 1000 + entry.combos + entry.score * 0.1;
+      if (value > bestValue) {
+        bestValue = value;
+        best = id;
+      }
+    });
+    if (!best) {
+      break;
+    }
+    chosen.push(best);
+    byShoe[best].conds.forEach((c) => covered.add(c));
+  }
+  return chosen;
+}
+
+/**
  * Подбор капсулы.
  * @param {object} pool Результат buildPool()
  * @param {{t: number, rain: boolean}[]} days Дни поездки
@@ -207,20 +245,8 @@ export function buildCapsule(pool, days, options = {}) {
   const possibleAtAll = tripOutfits(pool, conditions).filter((outfit) =>
     outfit.ids.every((id) => !ruleExcluded.includes(id)),
   );
-  const outfits = weatherFitOuter(
-    tripOutfits(pool, conditions).filter((outfit) => outfit.ids.every((id) => !excluded.has(id))),
-    conditions,
-  );
-
-  /* Сколько образов поездки держится на вещи: универсальные вещи важнее */
-  const freq = {};
-  const byItem = {};
-  outfits.forEach((outfit) => {
-    outfit.ids.forEach((id) => {
-      freq[id] = (freq[id] || 0) + 1;
-      (byItem[id] = byItem[id] || []).push(outfit);
-    });
-  });
+  const allowedOutfits = tripOutfits(pool, conditions).filter((outfit) => outfit.ids.every((id) => !excluded.has(id)));
+  let outfits = weatherFitOuter(allowedOutfits, conditions);
 
   const pinnedCounts = {o: 0, m: 0, t: 0, b: 0, s: 0};
   pinned.forEach((id) => {
@@ -242,6 +268,27 @@ export function buildCapsule(pool, days, options = {}) {
   travelItems.forEach((id) => excluded.add(id));
   limits.s -= travelItems.length;
   /* Пара только для дороги входит в те же 2–3 пары, поэтому на ходьбу остаётся на одну меньше */
+
+  /*
+   * Сначала обувь, как на основной странице: подбираются пары, которые вместе закрывают всю погоду поездки
+   * и дают больше всего сочетаний, а вся остальная капсула собирается уже вокруг них.
+   */
+  const shoes = pickShoes(allowedOutfits, conditions, limits.s, pinned, pool);
+  outfits = weatherFitOuter(
+    allowedOutfits.filter((outfit) => shoes.includes(outfit.s)),
+    conditions,
+  );
+  const pinnedWithShoes = [...new Set([...pinned, ...shoes])];
+
+  /* Сколько образов поездки держится на вещи: универсальные вещи важнее */
+  const freq = {};
+  const byItem = {};
+  outfits.forEach((outfit) => {
+    outfit.ids.forEach((id) => {
+      freq[id] = (freq[id] || 0) + 1;
+      (byItem[id] = byItem[id] || []).push(outfit);
+    });
+  });
 
   /* Холодные дни определяют куртку и низ, жаркие лёгкие вещи, поэтому пробуем несколько порядков и берём лучший */
   const optionCount = conditions.map((_, index) => outfits.filter((o) => o.conds.has(index)).length);
@@ -287,7 +334,7 @@ export function buildCapsule(pool, days, options = {}) {
         counts[capsuleSlot(pool.items[id])] += 1;
       }
     };
-    pinned.filter((id) => capsuleSlot(pool.items[id]) in counts).forEach(add);
+    pinnedWithShoes.filter((id) => capsuleSlot(pool.items[id]) in counts).forEach(add);
 
     const fits = (ids) => {
       const extra = {};
