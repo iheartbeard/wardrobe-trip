@@ -1,0 +1,20 @@
+{
+  "name": "wardrobe-trip",
+  "version": "1.0.0",
+  "description": "Капсульный гардероб на поездку из своих вещей: по погоде, дням и размеру багажа",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node tools/serve.mjs",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "globals": "^15.0.0",
+    "prettier": "^3.3.0"
+  }
+}
