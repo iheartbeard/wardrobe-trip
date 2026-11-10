@@ -355,3 +355,25 @@
 .checklist .pack-h:first-child {
   margin-top: 0;
 }
+
+.fld select {
+  font: 500 15px var(--f-body);
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 10px;
+  width: 100%;
+  min-width: 0;
+}
+.road {
+  font-size: 11px;
+  color: var(--fg);
+  background: var(--sel);
+  border-radius: 999px;
+  padding: 1px 8px;
+  margin-left: auto;
+}
+.road + .rainy {
+  margin-left: 0;
+}

@@ -156,6 +156,14 @@ export function buildCapsule(pool, days, options = {}) {
     limits[slot] = Math.max(limits[slot], pinnedCounts[slot]);
   });
   limits.t = Math.min(limits.t, Math.max(2, days.length, pinnedCounts.t));
+  /*
+   * Пара только для дороги (любая, которую выберешь): едешь в ней в первый и последний день,
+   * в образы на остальные дни она не идёт и занимает одно место в лимите обуви.
+   * С одной парой в лимите отдельной пары для дороги нет.
+   */
+  const travelItems = options.travelShoe && pool.items[options.travelShoe] && limits.s > 1 ? [options.travelShoe] : [];
+  travelItems.forEach((id) => excluded.add(id));
+  limits.s -= travelItems.length;
   /* Пара только для дороги входит в те же 2–3 пары, поэтому на ходьбу остаётся на одну меньше */
 
   /* Холодные дни определяют куртку и низ, жаркие лёгкие вещи, поэтому пробуем несколько порядков и берём лучший */
@@ -367,8 +375,9 @@ export function buildCapsule(pool, days, options = {}) {
   const finalCovered = coveredSet();
   return {
     conditions,
-    limits,
-    ids: [...chosen, ...eventItems],
+    limits: {...limits, s: limits.s + travelItems.length},
+    ids: [...chosen, ...eventItems, ...travelItems],
+    travelItems,
     eventItems,
     outfits: capsuleOutfits,
     gaps: conditions.filter((_, index) => !finalCovered.has(index)),
@@ -391,7 +400,8 @@ export function planDays(pool, capsule, days) {
   const scarves = capsule.ids.filter((id) => pool.items[id].slot === 'sc');
   let previous = null;
 
-  return days.map((day) => {
+  return days.map((day, dayIndex) => {
+    const travel = capsule.travelItems.length > 0 && (dayIndex === 0 || dayIndex === days.length - 1);
     const condIndex = capsule.conditions.findIndex((c) => c.t === clampTemp(day.t) && c.rain === !!day.rain);
     const options = capsule.outfits.filter((outfit) => outfit.conds.has(condIndex));
     let best = null;
@@ -413,7 +423,7 @@ export function planDays(pool, capsule, days) {
       }
     });
     if (!best) {
-      return {day, outfit: null, shoe: null, tee: null, head: null, scarf: null};
+      return {day, outfit: null, shoe: null, travel, tee: null, head: null, scarf: null};
     }
     usedKey.add(best.ids.join('|'));
     [best.m, best.b, best.o, best.s].forEach((id) => {
@@ -440,7 +450,8 @@ export function planDays(pool, capsule, days) {
     return {
       day,
       outfit: best,
-      shoe: best.s,
+      shoe: travel ? capsule.travelItems[0] : best.s,
+      travel,
       tee,
       head: fitting(heads),
       scarf: t <= 10 ? fitting(scarves) : null,

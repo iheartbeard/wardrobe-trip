@@ -110,3 +110,20 @@ test('слипоны и Palermo в поездку не предлагаются'
     }
   }
 });
+
+test('пара только для дороги: любая, на первый и последний день, входит в лимит', () => {
+  const days = manualDays(trips.осень);
+  for (const shoe of ['bos', 'n990t']) {
+    const capsule = buildCapsule(pool, days, {luggage: 'carryon', travelShoe: shoe});
+    assert.deepEqual(capsule.travelItems, [shoe]);
+    assert.ok(capsule.outfits.every((outfit) => outfit.s !== shoe));
+    const shoes = capsule.ids.filter((id) => capsuleSlot(pool.items[id]) === 's');
+    assert.ok(shoes.length <= LUGGAGE.carryon.s);
+    planDays(pool, capsule, days).forEach((entry, i) => {
+      const road = i === 0 || i === days.length - 1;
+      assert.equal(entry.travel, road);
+      assert.equal(entry.shoe === shoe, road);
+    });
+  }
+  assert.deepEqual(buildCapsule(pool, days, {luggage: 'backpack', travelShoe: 'bos'}).travelItems, []);
+});
