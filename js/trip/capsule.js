@@ -31,6 +31,9 @@ export const SLOT_TITLES = {
  */
 export const EVENT_ONLY = ['tim'];
 
+/** Кеды и слипоны в поездку не берутся: ходить много, нужна обувь с нормальной амортизацией. */
+export const NOT_FOR_WALKING = ['rc', 'van', 'pal'];
+
 /** Самый холодный и самый тёплый день, которые умеет собрать гардероб. */
 export const TRIP_LIMITS = [0, 32];
 
@@ -120,7 +123,7 @@ export function tripOutfits(pool, conditions) {
  */
 export function buildCapsule(pool, days, options = {}) {
   const limits = {...LUGGAGE[options.luggage || 'cabin']};
-  const excluded = new Set([...(options.excluded || []), ...EVENT_ONLY]);
+  const excluded = new Set([...(options.excluded || []), ...EVENT_ONLY, ...NOT_FOR_WALKING]);
   const pinned = (options.pinned || []).filter((id) => pool.items[id] && !excluded.has(id));
   const conditions = uniqueConditions(days);
   const outfits = tripOutfits(pool, conditions).filter((outfit) => outfit.ids.every((id) => !excluded.has(id)));
@@ -220,7 +223,8 @@ export function buildCapsule(pool, days, options = {}) {
 
     /* Шаг 1: каждое условие поездки закрывается хотя бы одним образом */
     for (const index of order) {
-      if (coveredSet().has(index)) {
+      const coveredNow = coveredSet();
+      if (coveredNow.has(index)) {
         continue;
       }
       let best = null;
@@ -231,7 +235,14 @@ export function buildCapsule(pool, days, options = {}) {
         }
         const fresh = outfit.ids.filter((id) => !chosen.has(id));
         const versatility = fresh.reduce((sum, id) => sum + freq[id], 0);
-        const value = fresh.length * 10 - outfit.score - outfit.conds.size * 0.5 - versatility * 0.002;
+        /* Образ, который заодно закрывает другие ещё не закрытые дни, экономит место в багаже */
+        let opens = 0;
+        outfit.conds.forEach((c) => {
+          if (!coveredNow.has(c)) {
+            opens += 1;
+          }
+        });
+        const value = fresh.length * 10 - outfit.score - opens * 3 - versatility * 0.002;
         if (value < bestValue) {
           bestValue = value;
           best = outfit;

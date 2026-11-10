@@ -101,3 +101,12 @@ test('ботинки 3-Eye в поездку только под меропри�
     planDays(pool, withEvent, days).forEach((entry) => assert.notEqual(entry.outfit && entry.outfit.s, 'tim'));
   }
 });
+
+test('кеды и слипоны в поездку не предлагаются', () => {
+  for (const trip of Object.values(trips)) {
+    for (const luggage of Object.keys(LUGGAGE)) {
+      const capsule = buildCapsule(pool, manualDays(trip), {luggage, pinned: ['rc']});
+      assert.ok(['rc', 'van', 'pal'].every((id) => !capsule.ids.includes(id)));
+    }
+  }
+});
