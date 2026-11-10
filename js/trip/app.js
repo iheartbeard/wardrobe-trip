@@ -18,7 +18,7 @@ import {
 import {searchPlaces, tripWeather} from './forecast.js';
 
 const STORAGE_KEY = 'garderob-trip';
-const SLOT_ORDER = ['o', 'v', 'm', 't', 'b', 's', 'h', 'sc'];
+const SLOT_ORDER = ['o', 'm', 't', 'b', 's', 'h', 'sc'];
 const doc = document;
 const $ = (id) => doc.getElementById(id);
 
