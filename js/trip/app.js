@@ -28,6 +28,7 @@ const defaults = () => {
     manual: {days: 7, tmin: 12, tmax: 20, rain: false},
     luggage: 'cabin',
     event: false,
+    travelShoes: false,
     built: false,
     pinned: [],
     excluded: [],
@@ -103,6 +104,7 @@ function fillInputs() {
   $('tmax').value = state.manual.tmax;
   $('rain').checked = state.manual.rain;
   $('event').checked = state.event;
+  $('travel-shoes').checked = state.travelShoes;
 }
 
 function readForm() {
@@ -217,6 +219,7 @@ function rebuild() {
     const capsule = buildCapsule(pool, days, {
       luggage: state.luggage,
       event: state.event,
+      travelShoes: state.travelShoes,
       pinned: state.pinned,
       excluded: state.excluded,
     });
@@ -232,13 +235,18 @@ function rebuild() {
 /* ---------- результат ---------- */
 
 /** В дорогу надевается самое тёплое: куртка и обувь с самой низкой нижней границей. */
+/** Вещи сверх лимитов: под мероприятие и для дороги. */
+const extraTag = (capsule, id) =>
+  capsule.eventItems.includes(id) ? 'для мероприятия' : capsule.travelItems.includes(id) ? 'только в дорогу' : '';
+
 function travelWear(capsule) {
   const lowest = (slot, low) =>
     capsule.ids
-      .filter((id) => pool.items[id].slot === slot && !capsule.eventItems.includes(id))
+      .filter((id) => pool.items[id].slot === slot && !extraTag(capsule, id))
       .sort((a, b) => low(pool.items[a]) - low(pool.items[b]))[0];
   const shoeLow = (s) => Math.min(...[s.dry, s.rain].filter(Boolean).map((r) => r[0]));
-  return [lowest('o', (o) => o.minTemp), lowest('s', shoeLow)].filter(Boolean);
+  const shoe = capsule.travelItems[0] || lowest('s', shoeLow);
+  return [lowest('o', (o) => o.minTemp), shoe].filter(Boolean);
 }
 
 function renderStats(capsule, days) {
@@ -300,9 +308,9 @@ function renderCapsule(capsule) {
           const tags = [
             usage[item.id] ? `в ${usage[item.id]} сочет.` : '',
             wear.includes(item.id) ? 'надеть в дорогу' : '',
-            capsule.eventItems.includes(item.id) ? 'для мероприятия' : '',
+            extraTag(capsule, item.id),
           ].filter(Boolean);
-          if (capsule.eventItems.includes(item.id)) {
+          if (extraTag(capsule, item.id)) {
             return `<div class="card tcard">${dot(item)}<span class="nm">${esc(item.name)}</span><span class="meta"><span>${esc(item.colorName)}</span>${tags.map((t) => `<span class="tg">${esc(t)}</span>`).join('')}</span></div>`;
           }
           return (
@@ -314,10 +322,10 @@ function renderCapsule(capsule) {
         })
         .join('');
       const limit = capsule.limits[slot];
-      const daily = bySlot[slot].filter((item) => !capsule.eventItems.includes(item.id)).length;
+      const daily = bySlot[slot].filter((item) => !extraTag(capsule, item.id)).length;
       const extra = bySlot[slot].length - daily;
       const counter = limit
-        ? ` <span class="cnt">${daily} из ${limit}${extra ? ` + ${extra} для мероприятия` : ''}</span>`
+        ? ` <span class="cnt">${daily} из ${limit}${extra ? ` + ${extra} сверх лимита` : ''}</span>`
         : '';
       return `<div class="grp"><h3>${SLOT_TITLES[slot]}${counter}</h3><div class="cards">${cards}</div></div>`;
     })
@@ -335,16 +343,15 @@ function renderCapsule(capsule) {
 
 function renderPlan(plan) {
   $('plan').innerHTML = plan
-    .map(({day, outfit, tee, head, scarf}, index) => {
+    .map(({day, outfit, shoe, travel, tee, head, scarf}, index) => {
       const title = day.date ? weekday(day.date) : `День ${index + 1}`;
       const range = day.tmin != null ? `<small>${formatTemp(day.tmin)}…${formatTemp(day.tmax)}</small>` : '';
-      const badge = day.rain ? '<span class="rainy">дождь</span>' : '';
+      const badge =
+        (travel ? '<span class="road">в дороге</span>' : '') + (day.rain ? '<span class="rainy">дождь</span>' : '');
       if (!outfit) {
         return `<article class="day"><header><b>${esc(title)}</b><span class="t">${formatTemp(day.t)}°${range}</span>${badge}</header><p class="note">Нет образа из капсулы на эту погоду.</p></article>`;
       }
-      const ids = [outfit.o !== 'none' ? outfit.o : null, tee, outfit.m, outfit.b, outfit.s, head, scarf].filter(
-        Boolean,
-      );
+      const ids = [outfit.o !== 'none' ? outfit.o : null, tee, outfit.m, outfit.b, shoe, head, scarf].filter(Boolean);
       const unique = [...new Set(ids)];
       const items = unique
         .map(
@@ -370,7 +377,7 @@ function renderPack(capsule) {
       const done = state.packed.includes(id);
       return (
         `<li><label class="${done ? 'done' : ''}"><input type="checkbox" data-pack="${esc(id)}"${done ? ' checked' : ''} />` +
-        `${miniDot(item)}<span>${esc(item.name)} <em>${esc(item.colorName)}</em>${wear.includes(id) ? ' <span class="tg">в дорогу</span>' : ''}${capsule.eventItems.includes(id) ? ' <span class="tg">для мероприятия</span>' : ''}</span></label></li>`
+        `${miniDot(item)}<span>${esc(item.name)} <em>${esc(item.colorName)}</em>${wear.includes(id) ? ' <span class="tg">в дорогу</span>' : ''}${extraTag(capsule, id) ? ` <span class="tg">${extraTag(capsule, id)}</span>` : ''}</span></label></li>`
       );
     })
     .join('');
@@ -428,6 +435,13 @@ function bind() {
     save();
   });
   /* Даты и ручная погода запоминаются сразу, без нажатия «Собрать капсулу» */
+  $('travel-shoes').addEventListener('change', () => {
+    state.travelShoes = $('travel-shoes').checked;
+    save();
+    if (lastCapsule) {
+      rebuild();
+    }
+  });
   $('event').addEventListener('change', () => {
     state.event = $('event').checked;
     save();

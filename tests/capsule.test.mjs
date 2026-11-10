@@ -106,7 +106,21 @@ test('слипоны и Palermo в поездку не предлагаются'
   for (const trip of Object.values(trips)) {
     for (const luggage of Object.keys(LUGGAGE)) {
       const capsule = buildCapsule(pool, manualDays(trip), {luggage, pinned: ['van']});
-      assert.ok(['van', 'pal'].every((id) => !capsule.ids.includes(id)));
+      assert.ok(['van', 'pal', 'w1', 'w2', 'bos'].every((id) => !capsule.ids.includes(id)));
     }
   }
+});
+
+test('Birkenstock Boston только на дни в дороге', () => {
+  const days = manualDays(trips.осень);
+  const capsule = buildCapsule(pool, days, {travelShoes: true});
+  assert.deepEqual(capsule.travelItems, ['bos']);
+  assert.ok(capsule.outfits.every((outfit) => outfit.s !== 'bos'));
+  const plan = planDays(pool, capsule, days);
+  plan.forEach((entry, i) => {
+    const road = i === 0 || i === plan.length - 1;
+    assert.equal(entry.travel, road);
+    assert.equal(entry.shoe === 'bos', road);
+  });
+  assert.ok(!buildCapsule(pool, days).ids.includes('bos'));
 });
