@@ -219,7 +219,10 @@ test('обувь подбирается первой и закрывает по�
 });
 
 test('если все тёплые слои заменены, капсула подсказывает, что вернуть', () => {
-  const excluded = ['tra', 'swd', 'swf', 'sws', 'tu', 'tuv', 'swl', 'ssm'];
+  /* Убраны все слои, которые носятся ниже +10: свитеры, свитшоты, тёплые худи, жилет Taion */
+  const excluded = Object.values(pool.items)
+    .filter((item) => ['sw', 'ss', 'vs'].includes(item.kind) || item.warm || item.id === 'tu')
+    .map((item) => item.id);
   const days = [6, 9, 9, 10].map((t) => ({t, season: 'autumn'}));
   const capsule = buildCapsule(pool, days, {luggage: 'carryon', excluded});
   assert.deepEqual(
