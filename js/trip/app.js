@@ -36,6 +36,7 @@ const defaults = () => {
     end: iso(end),
     manual: {days: 7, tmin: 12, tmax: 20, rain: false},
     luggage: DEFAULT_LUGGAGE,
+    bags: {backpack: true, suitcase: true},
     event: false,
     travelShoe: '',
     built: false,
@@ -46,12 +47,26 @@ const defaults = () => {
   };
 };
 
+const BAGS = [
+  {key: 'backpack', label: 'Рюкзак'},
+  {key: 'suitcase', label: 'Маленький чемодан'},
+];
+
+/** Лимиты задаёт чемодан: с ним одежда едет в нём, без него всё в рюкзаке. */
+const luggageFor = (bags) => (bags.suitcase ? 'carryon' : 'backpack');
+
 function load() {
   try {
-    const saved = {...defaults(), ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')};
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    const saved = {...defaults(), ...raw};
     if (!LUGGAGE[saved.luggage]) {
       saved.luggage = DEFAULT_LUGGAGE;
     }
+    /* Раньше багаж был одним выбором: «Рюкзак» значит только рюкзак, остальное значит рюкзак и чемодан */
+    if (!raw.bags || (!saved.bags.backpack && !saved.bags.suitcase)) {
+      saved.bags = {backpack: true, suitcase: saved.luggage !== 'backpack'};
+    }
+    saved.luggage = luggageFor(saved.bags);
     return saved;
   } catch {
     return defaults();
@@ -100,12 +115,10 @@ function renderForm() {
     .forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === state.mode)));
   $('place-fields').hidden = state.mode !== 'place';
   $('manual-fields').hidden = state.mode !== 'manual';
-  $('luggage').innerHTML = Object.entries(LUGGAGE)
-    .map(
-      ([key, lug]) =>
-        `<button type="button" data-lug="${key}" aria-pressed="${key === state.luggage}">${esc(lug.label)}</button>`,
-    )
-    .join('');
+  $('luggage').innerHTML = BAGS.map(
+    (bag) =>
+      `<button type="button" data-bag="${bag.key}" aria-pressed="${!!state.bags[bag.key]}">${esc(bag.label)}</button>`,
+  ).join('');
 }
 
 /** Поля ввода заполняются из сохранённого состояния один раз, при открытии страницы. */
@@ -428,17 +441,24 @@ function packSections(capsule) {
     {id: 'x:wash', text: 'Туалетный набор'},
     {id: 'x:under', text: `Small куб: трусы и носки × ${underwear}`},
   ];
-  const onlyBackpack = state.luggage === 'backpack';
-  return [
-    {title: 'На себе в дорогу', items: wearIds},
-    {title: 'Рюкзак', items: onlyBackpack ? [...basics, ...cube, ...loose] : basics},
-    ...(onlyBackpack
-      ? []
-      : [
-          {title: 'Чемодан: Medium куб', items: cube},
-          {title: 'Чемодан: остальное', items: loose},
-        ]),
-  ].filter((section) => section.items.length);
+  const {backpack, suitcase} = state.bags;
+  let sections;
+  if (backpack && suitcase) {
+    sections = [
+      {title: 'Рюкзак', items: basics},
+      {title: 'Чемодан: Medium куб', items: cube},
+      {title: 'Чемодан: остальное', items: loose},
+    ];
+  } else if (suitcase) {
+    sections = [
+      {title: 'Чемодан: техника и мелочи', items: basics},
+      {title: 'Чемодан: Medium куб', items: cube},
+      {title: 'Чемодан: остальное', items: loose},
+    ];
+  } else {
+    sections = [{title: 'Рюкзак', items: [...basics, ...cube, ...loose]}];
+  }
+  return [{title: 'На себе в дорогу', items: wearIds}, ...sections].filter((section) => section.items.length);
 }
 
 function renderPack(capsule) {
@@ -493,10 +513,16 @@ function bind() {
     }
   });
   $('luggage').addEventListener('click', (event) => {
-    const button = event.target.closest('[data-lug]');
+    const button = event.target.closest('[data-bag]');
     if (button) {
       readForm();
-      state.luggage = button.dataset.lug;
+      const key = button.dataset.bag;
+      const next = {...state.bags, [key]: !state.bags[key]};
+      if (!next.backpack && !next.suitcase) {
+        return;
+      }
+      state.bags = next;
+      state.luggage = luggageFor(next);
       save();
       renderForm();
       if (lastCapsule) {
