@@ -313,9 +313,18 @@ function renderStats(capsule, days) {
   if (capsule.impossible.length) {
     lines.push(`Для ${capsule.impossible.map(name).join(', ')} в гардеробе нет подходящего образа.`);
   }
-  const tight = capsule.gaps.filter((g) => !capsule.impossible.includes(g));
-  if (tight.length) {
-    lines.push(`Для ${tight.map(name).join(', ')} образ не уместился в лимит багажа, попробуй «Чемодан».`);
+  const tight = capsule.gaps.filter((g) => !capsule.impossible.includes(g) && !capsule.replacedGaps.includes(g));
+  if (capsule.replacedGaps.length) {
+    lines.push(
+      `Для ${capsule.replacedGaps.map(name).join(', ')} всё подходящее уже заменено. Верни одну из заменённых вещей.`,
+    );
+  }
+  if (capsule.outerShort && !capsule.replacedGaps.length) {
+    lines.push(
+      'Курток и жилеток, которые подходят под всю погоду поездки, больше не осталось. Верни одну из заменённых.',
+    );
+  } else if (tight.length) {
+    lines.push(`Для ${tight.map(name).join(', ')} образ не уместился в лимит багажа, попробуй добавить чемодан.`);
   }
   $('gaps').hidden = !lines.length;
   $('gaps').textContent = lines.join(' ');
@@ -597,6 +606,24 @@ function bind() {
       save();
       renderPack(lastCapsule);
     }
+  });
+  $('reset').addEventListener('click', () => {
+    if (!window.confirm('Сбросить всё: поездку, закреплённые и заменённые вещи, отметки сборов?')) {
+      return;
+    }
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* без хранилища просто начинаем заново */
+    }
+    state = defaults();
+    lastCapsule = null;
+    lastPlan = [];
+    $('out').hidden = true;
+    $('places').hidden = true;
+    status('');
+    renderForm();
+    fillInputs();
   });
   $('unpack').addEventListener('click', () => {
     state.packed = [];

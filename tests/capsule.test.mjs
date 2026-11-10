@@ -160,3 +160,19 @@ test('верхний слой один: куртка или жилетка, бе
     }
   }
 });
+
+test('при замене верхнего слоя берутся только варианты под всю погоду поездки', () => {
+  const days = manualDays({days: 7, tmin: 6, tmax: 14, rain: true});
+  const excluded = [];
+  for (let i = 0; i < 4; i++) {
+    const capsule = buildCapsule(pool, days, {luggage: 'carryon', excluded});
+    assert.deepEqual(capsule.gaps, [], `замена ${i}`);
+    assert.equal(capsule.outerShort, false);
+    excluded.push(capsule.ids.find((id) => capsuleSlot(pool.items[id]) === 'o'));
+  }
+  const tight = buildCapsule(pool, manualDays({days: 5, tmin: 2, tmax: 9}), {
+    luggage: 'carryon',
+    excluded: ['rx', 'rxt'],
+  });
+  assert.equal(typeof tight.outerShort, 'boolean');
+});

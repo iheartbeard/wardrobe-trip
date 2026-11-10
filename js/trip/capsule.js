@@ -129,6 +129,34 @@ export function tripOutfits(pool, conditions) {
 }
 
 /**
+ * Верхний слой в капсуле один, поэтому он должен подходить под всю погоду поездки:
+ * закрывать каждый день, когда без куртки или жилетки не обойтись. Остальные варианты верхнего слоя
+ * отбрасываются, в том числе при замене. Если ни один не закрывает все такие дни, остаются те,
+ * что закрывают больше всего.
+ */
+export function weatherFitOuter(outfits, conditions) {
+  const needOuter = conditions
+    .map((_, index) => index)
+    .filter((index) => !outfits.some((outfit) => outfit.o === 'none' && outfit.conds.has(index)));
+  if (!needOuter.length) {
+    return Object.assign(outfits, {outerShort: false});
+  }
+  const reach = {};
+  outfits.forEach((outfit) => {
+    if (outfit.o !== 'none') {
+      reach[outfit.o] = reach[outfit.o] || new Set();
+      outfit.conds.forEach((c) => reach[outfit.o].add(c));
+    }
+  });
+  const score = (id) => needOuter.filter((c) => reach[id].has(c)).length;
+  const best = Math.max(0, ...Object.keys(reach).map(score));
+  const allowed = new Set(Object.keys(reach).filter((id) => score(id) === best));
+  const result = outfits.filter((outfit) => outfit.o === 'none' || allowed.has(outfit.o));
+  /* Ни один оставшийся вариант не закрывает всю погоду: обычно это после нескольких замен */
+  return Object.assign(result, {outerShort: best < needOuter.length});
+}
+
+/**
  * Подбор капсулы.
  * @param {object} pool Результат buildPool()
  * @param {{t: number, rain: boolean}[]} days Дни поездки
@@ -140,10 +168,17 @@ export function buildCapsule(pool, days, options = {}) {
   if (limits.s > 2 && days.length <= SHORT_TRIP_DAYS) {
     limits.s = 2;
   }
-  const excluded = new Set([...(options.excluded || []), ...EVENT_ONLY, ...NOT_FOR_WALKING]);
+  const ruleExcluded = [...EVENT_ONLY, ...NOT_FOR_WALKING];
+  const excluded = new Set([...(options.excluded || []), ...ruleExcluded]);
   const pinned = (options.pinned || []).filter((id) => pool.items[id] && !excluded.has(id));
   const conditions = uniqueConditions(days);
-  const outfits = tripOutfits(pool, conditions).filter((outfit) => outfit.ids.every((id) => !excluded.has(id)));
+  const possibleAtAll = tripOutfits(pool, conditions).filter((outfit) =>
+    outfit.ids.every((id) => !ruleExcluded.includes(id)),
+  );
+  const outfits = weatherFitOuter(
+    tripOutfits(pool, conditions).filter((outfit) => outfit.ids.every((id) => !excluded.has(id))),
+    conditions,
+  );
 
   /* Сколько образов поездки держится на вещи: универсальные вещи важнее */
   const freq = {};
@@ -391,7 +426,14 @@ export function buildCapsule(pool, days, options = {}) {
     eventItems,
     outfits: capsuleOutfits,
     gaps: conditions.filter((_, index) => !finalCovered.has(index)),
-    impossible: conditions.filter((_, index) => !outfits.some((outfit) => outfit.conds.has(index))),
+    outerShort: outfits.outerShort,
+    /* Нет образа во всём гардеробе (без учёта твоих замен) */
+    impossible: conditions.filter((_, index) => !possibleAtAll.some((outfit) => outfit.conds.has(index))),
+    /* Образ в гардеробе есть, но всё подходящее заменено */
+    replacedGaps: conditions.filter(
+      (_, index) =>
+        possibleAtAll.some((outfit) => outfit.conds.has(index)) && !outfits.some((outfit) => outfit.conds.has(index)),
+    ),
   };
 }
 
