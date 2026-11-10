@@ -137,3 +137,26 @@ test('с чемоданом на короткую поездку две пары
   assert.equal(long.limits.s, 3);
 });
 
+test('куртка в поездку всегда одна', () => {
+  for (const trip of Object.values(trips)) {
+    for (const luggage of Object.keys(LUGGAGE)) {
+      const capsule = buildCapsule(pool, manualDays(trip), {luggage});
+      assert.ok(capsule.ids.filter((id) => capsuleSlot(pool.items[id]) === 'o').length <= 1);
+    }
+  }
+});
+
+test('к куртке можно взять жилетку, если сочетаются; с рюкзаком без жилетки', () => {
+  let withVest = 0;
+  for (const trip of Object.values(trips)) {
+    for (const luggage of Object.keys(LUGGAGE)) {
+      const capsule = buildCapsule(pool, manualDays(trip), {luggage});
+      const jackets = capsule.ids.filter((id) => capsuleSlot(pool.items[id]) === 'o');
+      const vests = capsule.ids.filter((id) => capsuleSlot(pool.items[id]) === 'v');
+      assert.ok(vests.length <= LUGGAGE[luggage].v);
+      jackets.forEach((j) => vests.forEach((v) => assert.ok(evaluateColors([pool.items[j], pool.items[v]]))));
+      withVest += vests.length;
+    }
+  }
+  assert.ok(withVest > 0, 'жилетка хоть где-то берётся');
+});

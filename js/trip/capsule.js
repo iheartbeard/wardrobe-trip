@@ -14,10 +14,12 @@ import {SUMMER_SEASON} from './summer.js';
  * Рюкзак (~24 л): большую часть места занимают техника, туалетный набор и куб с бельём,
  * поэтому одежды немного и одна пара обуви, та, что на ногах.
  * Рюкзак + маленький чемодан для ручной клади (~38 л): одежда едет в чемодане, рюкзак под технику.
+ * Куртка всегда одна, та, в которой едешь: несколько курток в поездку не берутся.
+ * К ней с чемоданом можно взять жилетку, если они сочетаются по цвету.
  */
 export const LUGGAGE = {
-  backpack: {label: 'Рюкзак', o: 1, m: 2, t: 3, b: 2, s: 1, h: 1},
-  carryon: {label: 'Маленький чемодан', o: 2, m: 3, t: 7, b: 3, s: 3, h: 2},
+  backpack: {label: 'Рюкзак', o: 1, v: 0, m: 2, t: 3, b: 2, s: 1, h: 1},
+  carryon: {label: 'Маленький чемодан', o: 1, v: 1, m: 3, t: 7, b: 3, s: 3, h: 2},
 };
 
 export const DEFAULT_LUGGAGE = 'carryon';
@@ -26,7 +28,8 @@ export const DEFAULT_LUGGAGE = 'carryon';
 export const SHORT_TRIP_DAYS = 4;
 
 export const SLOT_TITLES = {
-  o: 'Верхняя одежда',
+  o: 'Куртка',
+  v: 'Жилетка',
   m: 'Средний слой',
   t: 'Футболки',
   b: 'Низ',
@@ -69,9 +72,18 @@ export function buildPool() {
   return {models, items};
 }
 
-/** Слот вещи в капсуле: футболки отдельно от остального среднего слоя. */
-export const capsuleSlot = (item) =>
-  item.slot === 'm' || item.slot === 't' ? (item.kind === 'tee' ? 't' : 'm') : item.slot;
+/** Слот вещи в капсуле: футболки отдельно от остального среднего слоя, жилетки отдельно от курток. */
+export const capsuleSlot = (item) => {
+  if (item.slot === 'm' || item.slot === 't') {
+    return item.kind === 'tee' ? 't' : 'm';
+  }
+  if (item.slot === 'o' && item.group === 'Жилетки') {
+    return 'v';
+  }
+  return item.slot;
+};
+
+const OUTER_SLOTS = ['o', 'v'];
 
 const clampTemp = (t) => Math.max(TRIP_LIMITS[0], Math.min(TRIP_LIMITS[1], Math.round(t)));
 
@@ -152,7 +164,7 @@ export function buildCapsule(pool, days, options = {}) {
     });
   });
 
-  const pinnedCounts = {o: 0, m: 0, t: 0, b: 0, s: 0};
+  const pinnedCounts = {o: 0, v: 0, m: 0, t: 0, b: 0, s: 0};
   pinned.forEach((id) => {
     const slot = capsuleSlot(pool.items[id]);
     if (slot in pinnedCounts) {
@@ -210,7 +222,7 @@ export function buildCapsule(pool, days, options = {}) {
 
   function greedy(order) {
     const chosen = new Set();
-    const counts = {o: 0, m: 0, t: 0, b: 0, s: 0};
+    const counts = {o: 0, v: 0, m: 0, t: 0, b: 0, s: 0};
     const add = (id) => {
       if (!chosen.has(id)) {
         chosen.add(id);
@@ -229,6 +241,16 @@ export function buildCapsule(pool, days, options = {}) {
         extra[slot] = (extra[slot] || 0) + 1;
         if (counts[slot] + extra[slot] > limits[slot]) {
           return false;
+        }
+        /* Куртка и жилетка берутся вместе, только если сочетаются друг с другом */
+        if (OUTER_SLOTS.includes(slot)) {
+          const others = [...chosen, ...ids].filter((other) => {
+            const otherSlot = capsuleSlot(pool.items[other]);
+            return other !== id && OUTER_SLOTS.includes(otherSlot) && otherSlot !== slot;
+          });
+          if (others.some((other) => !evaluateColors([pool.items[other], pool.items[id]]))) {
+            return false;
+          }
         }
       }
       return true;

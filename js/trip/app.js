@@ -18,7 +18,7 @@ import {
 import {searchPlaces, tripWeather} from './forecast.js';
 
 const STORAGE_KEY = 'garderob-trip';
-const SLOT_ORDER = ['o', 'm', 't', 'b', 's', 'h', 'sc'];
+const SLOT_ORDER = ['o', 'v', 'm', 't', 'b', 's', 'h', 'sc'];
 const doc = document;
 const $ = (id) => doc.getElementById(id);
 
@@ -97,8 +97,8 @@ const miniDot = (item) =>
 
 const PIN_ICON =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l-1 6 4 4v2h-5v6l-1 1-1-1v-6H6v-2l4-4z" fill="currentColor"/></svg>';
-const X_ICON =
-  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+const SWAP_ICON =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 function weekday(date) {
   return new Date(`${date}T12:00:00`).toLocaleDateString('ru-RU', {weekday: 'short', day: 'numeric', month: 'short'});
@@ -276,7 +276,7 @@ const extraTag = (capsule, id) =>
 function travelWear(capsule) {
   const lowest = (slot, low) =>
     capsule.ids
-      .filter((id) => pool.items[id].slot === slot && !extraTag(capsule, id))
+      .filter((id) => capsuleSlot(pool.items[id]) === slot && !extraTag(capsule, id))
       .sort((a, b) => low(pool.items[a]) - low(pool.items[b]))[0];
   const shoeLow = (s) => Math.min(...[s.dry, s.rain].filter(Boolean).map((r) => r[0]));
   const shoe = capsule.travelItems[0] || lowest('s', shoeLow);
@@ -351,7 +351,7 @@ function renderCapsule(capsule) {
             `<div class="card tcard${pinned ? ' pinned' : ''}">${dot(item)}<span class="nm">${esc(item.name)}</span>` +
             `<span class="meta"><span>${esc(item.colorName)}</span>${tags.map((t) => `<span class="tg">${esc(t)}</span>`).join('')}</span>` +
             `<span class="acts"><button type="button" class="ib" data-pin="${esc(item.id)}" aria-pressed="${pinned}" aria-label="${pinned ? 'Открепить' : 'Закрепить'}: ${esc(item.name)}" title="${pinned ? 'Открепить' : 'Беру точно'}">${PIN_ICON}</button>` +
-            `<button type="button" class="ib" data-ex="${esc(item.id)}" aria-label="Не брать: ${esc(item.name)}" title="Не брать">${X_ICON}</button></span></div>`
+            `<button type="button" class="ib" data-ex="${esc(item.id)}" aria-label="Заменить: ${esc(item.name)}" title="Заменить">${SWAP_ICON}</button></span></div>`
           );
         })
         .join('');
