@@ -9,11 +9,18 @@ import {buildModel} from '../model.js';
 import {evaluateColors} from '../lib/color.js';
 import {SUMMER_SEASON} from './summer.js';
 
-/** Лимиты вещей по размеру багажа. Обувь считается вместе с парой, в которой едешь. */
+/**
+ * Лимиты вещей под реальный багаж. Вещи, в которых едешь, тоже считаются.
+ * Только Aer City Pack Pro 2 (24 л): большую часть места занимают техника, Wash Pouch и куб с бельём,
+ * поэтому одежды немного и одна пара обуви, та, что на ногах.
+ * CPP2 + кабинный Xiaomi S (22"): одежда едет в чемодане, рюкзак под технику.
+ */
 export const LUGGAGE = {
-  cabin: {label: 'Ручная кладь', o: 1, m: 2, t: 4, b: 2, s: 2, h: 1},
-  checked: {label: 'Чемодан', o: 2, m: 4, t: 7, b: 3, s: 3, h: 2},
+  backpack: {label: 'Только CPP2', o: 1, m: 2, t: 3, b: 2, s: 1, h: 1},
+  carryon: {label: 'CPP2 + Xiaomi S', o: 2, m: 4, t: 7, b: 3, s: 3, h: 2},
 };
+
+export const DEFAULT_LUGGAGE = 'carryon';
 
 export const SLOT_TITLES = {
   o: 'Верхняя одежда',
@@ -125,7 +132,7 @@ export function tripOutfits(pool, conditions) {
  * @param {{luggage?: string, pinned?: string[], excluded?: string[]}} [options]
  */
 export function buildCapsule(pool, days, options = {}) {
-  const limits = {...LUGGAGE[options.luggage || 'cabin']};
+  const limits = {...(LUGGAGE[options.luggage] || LUGGAGE[DEFAULT_LUGGAGE])};
   const excluded = new Set([...(options.excluded || []), ...EVENT_ONLY, ...NOT_FOR_WALKING, ...TRAVEL_ONLY]);
   const pinned = (options.pinned || []).filter((id) => pool.items[id] && !excluded.has(id));
   const conditions = uniqueConditions(days);
@@ -153,7 +160,8 @@ export function buildCapsule(pool, days, options = {}) {
   });
   limits.t = Math.min(limits.t, Math.max(2, days.length, pinnedCounts.t));
   /* Пара только для дороги входит в те же 2–3 пары, поэтому на ходьбу остаётся на одну меньше */
-  const travelItems = options.travelShoes ? TRAVEL_ONLY.filter((id) => pool.items[id]) : [];
+  /* С одной парой обуви ехать можно только в ней же, отдельной пары для дороги нет */
+  const travelItems = options.travelShoes && limits.s > 1 ? TRAVEL_ONLY.filter((id) => pool.items[id]) : [];
   limits.s = Math.max(1, limits.s - travelItems.length);
 
   /* Холодные дни определяют куртку и низ, жаркие лёгкие вещи, поэтому пробуем несколько порядков и берём лучший */

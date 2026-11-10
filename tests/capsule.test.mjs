@@ -59,8 +59,8 @@ for (const [name, trip] of Object.entries(trips)) {
       }
       assert.ok((counts.t || 0) >= 2, 'хотя бы две футболки');
       /* Непокрытыми могут остаться только условия, под которые в гардеробе нет образа вообще */
-      /* Разброс +8…+26 с дождём в ручную кладь не влезает: две пары обуви не закрывают и холодный дождь, и жару */
-      if (!(name === 'разброс' && luggage === 'cabin')) {
+      /* В один рюкзак с одной парой обуви дождь и сухие дни закрываются не всегда, это честные пробелы */
+      if (luggage !== 'backpack') {
         assert.ok(
           capsule.gaps.every((gap) => capsule.impossible.includes(gap)),
           'все возможные дни закрыты',
@@ -92,9 +92,9 @@ test('закреплённая вещь остаётся, убранная не 
 test('ботинки 3-Eye в поездку только под мероприятие, вне лимитов и плана', () => {
   for (const trip of Object.values(trips)) {
     const days = manualDays(trip);
-    const plain = buildCapsule(pool, days, {luggage: 'checked'});
+    const plain = buildCapsule(pool, days, {luggage: 'carryon'});
     assert.ok(!plain.ids.includes('tim'));
-    const withEvent = buildCapsule(pool, days, {luggage: 'checked', event: true});
+    const withEvent = buildCapsule(pool, days, {luggage: 'carryon', event: true});
     assert.deepEqual(withEvent.eventItems, ['tim']);
     assert.ok(withEvent.ids.includes('tim'));
     assert.ok(withEvent.outfits.every((outfit) => outfit.s !== 'tim'));
@@ -131,5 +131,8 @@ test('пара для дороги входит в лимит обуви', () =>
     const shoes = capsule.ids.filter((id) => capsuleSlot(pool.items[id]) === 's');
     assert.ok(shoes.length <= LUGGAGE[luggage].s, `${luggage}: ${shoes.length}`);
     assert.equal(capsule.limits.s, LUGGAGE[luggage].s);
+    if (LUGGAGE[luggage].s === 1) {
+      assert.deepEqual(capsule.travelItems, [], 'с одной парой отдельной пары для дороги нет');
+    }
   }
 });

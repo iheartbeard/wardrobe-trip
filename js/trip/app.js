@@ -5,7 +5,16 @@
  */
 import {esc} from '../ui/templates.js';
 import {formatTemp} from '../lib/temperature.js';
-import {LUGGAGE, SLOT_TITLES, buildCapsule, buildPool, capsuleSlot, manualDays, planDays} from './capsule.js';
+import {
+  DEFAULT_LUGGAGE,
+  LUGGAGE,
+  SLOT_TITLES,
+  buildCapsule,
+  buildPool,
+  capsuleSlot,
+  manualDays,
+  planDays,
+} from './capsule.js';
 import {searchPlaces, tripWeather} from './forecast.js';
 
 const STORAGE_KEY = 'garderob-trip';
@@ -26,7 +35,7 @@ const defaults = () => {
     start: iso(start),
     end: iso(end),
     manual: {days: 7, tmin: 12, tmax: 20, rain: false},
-    luggage: 'cabin',
+    luggage: DEFAULT_LUGGAGE,
     event: false,
     travelShoes: true,
     built: false,
@@ -39,7 +48,11 @@ const defaults = () => {
 
 function load() {
   try {
-    return {...defaults(), ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')};
+    const saved = {...defaults(), ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')};
+    if (!LUGGAGE[saved.luggage]) {
+      saved.luggage = DEFAULT_LUGGAGE;
+    }
+    return saved;
   } catch {
     return defaults();
   }
@@ -48,6 +61,7 @@ function load() {
 let state = load();
 let pool = null;
 let lastCapsule = null;
+let lastPlan = [];
 
 function save() {
   try {
@@ -224,7 +238,7 @@ function rebuild() {
       excluded: state.excluded,
     });
     const plan = planDays(pool, capsule, days);
-    state.packed = state.packed.filter((id) => capsule.ids.includes(id));
+    state.packed = state.packed.filter((id) => id.startsWith('x:') || capsule.ids.includes(id));
     state.built = true;
     save();
     renderResult(capsule, plan, days);
@@ -369,21 +383,80 @@ function renderPlan(plan) {
     .join('');
 }
 
+/**
+ * Чек-лист по местам: что надеть в дорогу, что в рюкзак CPP2, что в чемодан Xiaomi S.
+ * Small куб с бельём и носками едет в рюкзаке, футболки и средний слой в Medium кубе.
+ */
+function packSections(capsule) {
+  const days = lastPlan.length;
+  const wearIds = [];
+  const first = lastPlan[0];
+  if (first && first.outfit) {
+    [
+      first.outfit.o !== 'none' ? first.outfit.o : null,
+      first.tee,
+      first.outfit.m,
+      first.outfit.b,
+      first.shoe,
+      first.head,
+      first.scarf,
+    ]
+      .filter(Boolean)
+      .forEach((id) => wearIds.push(id));
+  }
+  /* Самую объёмную куртку и обувь везём на себе, даже если первый день тёплый */
+  travelWear(capsule).forEach((id) => {
+    if (!wearIds.includes(id) && !(first && first.outfit && capsuleSlot(pool.items[id]) === 's')) {
+      wearIds.unshift(id);
+    }
+  });
+  const rest = SLOT_ORDER.flatMap((slot) =>
+    capsule.ids.filter((id) => capsuleSlot(pool.items[id]) === slot && !wearIds.includes(id)),
+  );
+  const cube = rest.filter((id) => ['t', 'm'].includes(capsuleSlot(pool.items[id])));
+  const loose = rest.filter((id) => !cube.includes(id));
+  const underwear = Math.min(days || 1, 7);
+  const basics = [
+    {id: 'x:tech', text: 'Техника и зарядки'},
+    {id: 'x:wash', text: 'Wash Pouch'},
+    {id: 'x:under', text: `Small куб: трусы и носки × ${underwear}`},
+  ];
+  const onlyBackpack = state.luggage === 'backpack';
+  return [
+    {title: 'На себе в дорогу', items: wearIds},
+    {title: 'Рюкзак CPP2', items: onlyBackpack ? [...basics, ...cube, ...loose] : basics},
+    ...(onlyBackpack
+      ? []
+      : [
+          {title: 'Xiaomi S: Medium куб', items: cube},
+          {title: 'Xiaomi S: остальное', items: loose},
+        ]),
+  ].filter((section) => section.items.length);
+}
+
 function renderPack(capsule) {
   const wear = travelWear(capsule);
-  const items = SLOT_ORDER.flatMap((slot) => capsule.ids.filter((id) => capsuleSlot(pool.items[id]) === slot));
-  $('pack').innerHTML = items
-    .map((id) => {
+  const sections = packSections(capsule);
+  const row = (entry) => {
+    const id = typeof entry === 'string' ? entry : entry.id;
+    const done = state.packed.includes(id);
+    let body;
+    if (typeof entry === 'string') {
       const item = pool.items[id];
-      const done = state.packed.includes(id);
-      return (
-        `<li><label class="${done ? 'done' : ''}"><input type="checkbox" data-pack="${esc(id)}"${done ? ' checked' : ''} />` +
-        `${miniDot(item)}<span>${esc(item.name)} <em>${esc(item.colorName)}</em>${wear.includes(id) ? ' <span class="tg">в дорогу</span>' : ''}${extraTag(capsule, id) ? ` <span class="tg">${extraTag(capsule, id)}</span>` : ''}</span></label></li>`
-      );
-    })
+      const tag = extraTag(capsule, id);
+      body = `${miniDot(item)}<span>${esc(item.name)} <em>${esc(item.colorName)}</em>${tag ? ` <span class="tg">${tag}</span>` : ''}</span>`;
+    } else {
+      body = `<i class="cd nc"></i><span>${esc(entry.text)}</span>`;
+    }
+    return `<li><label class="${done ? 'done' : ''}"><input type="checkbox" data-pack="${esc(id)}"${done ? ' checked' : ''} />${body}</label></li>`;
+  };
+  $('pack').innerHTML = sections
+    .map((section) => `<li class="pack-h">${esc(section.title)}</li>${section.items.map(row).join('')}`)
     .join('');
-  const left = items.length - state.packed.length;
+  const all = sections.flatMap((section) => section.items.map((e) => (typeof e === 'string' ? e : e.id)));
+  const left = all.filter((id) => !state.packed.includes(id)).length;
   $('pack-hint').textContent = left ? `Осталось уложить: ${left}. Отметки сохраняются на телефоне.` : 'Всё уложено.';
+  return wear;
 }
 
 function renderResult(capsule, plan, days) {
@@ -391,8 +464,9 @@ function renderResult(capsule, plan, days) {
   renderStats(capsule, days);
   renderCapsule(capsule);
   renderPlan(plan);
-  renderPack(capsule);
   lastCapsule = capsule;
+  lastPlan = plan;
+  renderPack(capsule);
 }
 
 /* ---------- события ---------- */

@@ -355,3 +355,15 @@
 .road + .rainy {
   margin-left: 0;
 }
+
+.checklist .pack-h {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 14px 0 2px;
+  padding-left: 10px;
+}
+.checklist .pack-h:first-child {
+  margin-top: 0;
+}
