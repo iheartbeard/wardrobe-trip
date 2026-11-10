@@ -75,25 +75,32 @@ function weekday(date) {
 
 /* ---------- форма ---------- */
 
+const placeLabel = (place) => `${place.name}${place.country ? `, ${place.country}` : ''}`;
+
+/** Переключатели режима и багажа. Поля ввода здесь не трогаются, чтобы не сбросить то, что уже введено. */
 function renderForm() {
   doc
     .querySelectorAll('#mode button')
     .forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === state.mode)));
   $('place-fields').hidden = state.mode !== 'place';
   $('manual-fields').hidden = state.mode !== 'manual';
-  $('q').value = state.place ? state.place.name : state.query;
-  $('start').value = state.start;
-  $('end').value = state.end;
-  $('days').value = state.manual.days;
-  $('tmin').value = state.manual.tmin;
-  $('tmax').value = state.manual.tmax;
-  $('rain').checked = state.manual.rain;
   $('luggage').innerHTML = Object.entries(LUGGAGE)
     .map(
       ([key, lug]) =>
         `<button type="button" data-lug="${key}" aria-pressed="${key === state.luggage}">${esc(lug.label)}</button>`,
     )
     .join('');
+}
+
+/** Поля ввода заполняются из сохранённого состояния один раз, при открытии страницы. */
+function fillInputs() {
+  $('q').value = state.place ? placeLabel(state.place) : state.query;
+  $('start').value = state.start;
+  $('end').value = state.end;
+  $('days').value = state.manual.days;
+  $('tmin').value = state.manual.tmin;
+  $('tmax').value = state.manual.tmax;
+  $('rain').checked = state.manual.rain;
 }
 
 function readForm() {
@@ -129,7 +136,7 @@ function renderPlaces(list) {
     state.place = list[Number(button.dataset.i)];
     state.query = state.place.name;
     box.hidden = true;
-    $('q').value = `${state.place.name}${state.place.country ? `, ${state.place.country}` : ''}`;
+    $('q').value = placeLabel(state.place);
     save();
   };
 }
@@ -386,6 +393,7 @@ function bind() {
   $('luggage').addEventListener('click', (event) => {
     const button = event.target.closest('[data-lug]');
     if (button) {
+      readForm();
       state.luggage = button.dataset.lug;
       save();
       renderForm();
@@ -403,6 +411,15 @@ function bind() {
   });
   $('q').addEventListener('input', () => {
     state.place = null;
+    state.query = $('q').value.trim();
+    save();
+  });
+  /* Даты и ручная погода запоминаются сразу, без нажатия «Собрать капсулу» */
+  $('form').addEventListener('change', (event) => {
+    if (event.target.matches('#start, #end, #days, #tmin, #tmax, #rain')) {
+      readForm();
+      save();
+    }
   });
   $('form').addEventListener('submit', (event) => {
     event.preventDefault();
@@ -447,6 +464,7 @@ function bind() {
 }
 
 renderForm();
+fillInputs();
 bind();
 if (state.built) {
   rebuild();
