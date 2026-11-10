@@ -385,10 +385,19 @@ function renderStats(capsule, days) {
     lines.push(`Для ${capsule.impossible.map(name).join(', ')} в гардеробе нет подходящего образа.`);
   }
   const tight = capsule.gaps.filter((g) => !capsule.impossible.includes(g) && !capsule.replacedGaps.includes(g));
+  let restoreHtml = '';
   if (capsule.replacedGaps.length) {
-    lines.push(
-      `Для ${capsule.replacedGaps.map(name).join(', ')} всё подходящее уже заменено. Верни одну из заменённых вещей.`,
-    );
+    lines.push(`Для ${capsule.replacedGaps.map(name).join(', ')} всё подходящее заменено. Верни одну из этих вещей:`);
+    restoreHtml = capsule.restore
+      .map(
+        (id) =>
+          `<button type="button" class="chip chip--btn" data-back="${esc(id)}">${miniDot(pool.items[id])}${esc(pool.items[id].name)} ↺</button>`,
+      )
+      .join('');
+  }
+  if (capsule.pinBlocked.length) {
+    const groups = capsule.pinBlocked.map((slot) => `«${SLOT_TITLES[slot]}»`).join(', ');
+    lines.push(`Места в ${groups} заняты закреплёнными вещями, и для части дней не подходит ни одна. Открепи одну.`);
   }
   if (capsule.outerShort && !capsule.replacedGaps.length) {
     lines.push(
@@ -398,7 +407,7 @@ function renderStats(capsule, days) {
     lines.push(`Для ${tight.map(name).join(', ')} образ не уместился в лимит багажа, попробуй добавить чемодан.`);
   }
   $('gaps').hidden = !lines.length;
-  $('gaps').textContent = lines.join(' ');
+  $('gaps').innerHTML = esc(lines.join(' ')) + (restoreHtml ? `<span class="chips restore">${restoreHtml}</span>` : '');
 }
 
 function renderCapsule(capsule) {
@@ -464,7 +473,7 @@ function renderPlan(plan) {
       const badge =
         (travel ? '<span class="road">в дороге</span>' : '') + (day.rain ? '<span class="rainy">дождь</span>' : '');
       if (!outfit) {
-        return `<article class="day"><header><b>${esc(title)}</b><span class="t">${formatTemp(day.t)}°${range}</span>${badge}</header><p class="note">Нет образа из капсулы на эту погоду.</p></article>`;
+        return `<article class="day"><header><b>${esc(title)}</b><span class="t">${formatTemp(day.t)}°${range}</span>${badge}</header><p class="note">Нет образа из капсулы на эту погоду, причина написана над капсулой.</p></article>`;
       }
       const ids = [outfit.o !== 'none' ? outfit.o : null, tee, outfit.m, outfit.b, shoe, head, scarf].filter(Boolean);
       const unique = [...new Set(ids)];
@@ -679,6 +688,14 @@ function bind() {
     }
     save();
     rebuild();
+  });
+  $('gaps').addEventListener('click', (event) => {
+    const back = event.target.closest('[data-back]');
+    if (back) {
+      state.excluded = state.excluded.filter((id) => id !== back.dataset.back);
+      save();
+      rebuild();
+    }
   });
   $('excluded').addEventListener('click', (event) => {
     const back = event.target.closest('[data-back]');

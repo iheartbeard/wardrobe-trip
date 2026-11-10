@@ -518,6 +518,40 @@ export function buildCapsule(pool, days, options = {}) {
   const eventItems = options.event ? EVENT_ONLY.filter((id) => pool.items[id]) : [];
 
   const finalCovered = coveredSet();
+  const gapIdx = conditions.map((_, i) => i).filter((i) => !finalCovered.has(i));
+  const impossibleIdx = gapIdx.filter((i) => !possibleAtAll.some((outfit) => outfit.conds.has(i)));
+  const replacedIdx = gapIdx.filter(
+    (i) => !impossibleIdx.includes(i) && !allowedOutfits.some((outfit) => outfit.conds.has(i)),
+  );
+  /* Какие из заменённых вещей вернут образ на эти дни: чем больше дней закрывает, тем выше */
+  const restore = (options.excluded || [])
+    .map((id) => ({
+      id,
+      fixes: replacedIdx.filter((i) => possibleAtAll.some((outfit) => outfit.conds.has(i) && outfit.ids.includes(id)))
+        .length,
+    }))
+    .filter((entry) => entry.fixes > 0)
+    .sort((a, b) => b.fixes - a.fixes)
+    .map((entry) => entry.id);
+  /* Остальные пробелы: подходящие вещи есть, но места в группе заняты закреплёнными */
+  const pinBlocked = new Set();
+  gapIdx
+    .filter((i) => !impossibleIdx.includes(i) && !replacedIdx.includes(i))
+    .forEach((i) => {
+      allowedOutfits
+        .filter((outfit) => outfit.conds.has(i))
+        .forEach((outfit) =>
+          outfit.ids
+            .filter((id) => !chosen.has(id))
+            .forEach((id) => {
+              const slot = capsuleSlot(pool.items[id]);
+              const pinnedInSlot = pinned.filter((p) => capsuleSlot(pool.items[p]) === slot).length;
+              if (slot in limits && pinnedInSlot >= limits[slot]) {
+                pinBlocked.add(slot);
+              }
+            }),
+        );
+    });
   return {
     conditions,
     limits: {...limits, s: limits.s + travelItems.length},
@@ -528,12 +562,11 @@ export function buildCapsule(pool, days, options = {}) {
     gaps: conditions.filter((_, index) => !finalCovered.has(index)),
     outerShort: outfits.outerShort,
     /* Нет образа во всём гардеробе (без учёта твоих замен) */
-    impossible: conditions.filter((_, index) => !possibleAtAll.some((outfit) => outfit.conds.has(index))),
+    impossible: impossibleIdx.map((i) => conditions[i]),
     /* Образ в гардеробе есть, но всё подходящее заменено */
-    replacedGaps: conditions.filter(
-      (_, index) =>
-        possibleAtAll.some((outfit) => outfit.conds.has(index)) && !outfits.some((outfit) => outfit.conds.has(index)),
-    ),
+    replacedGaps: replacedIdx.map((i) => conditions[i]),
+    restore,
+    pinBlocked: [...pinBlocked],
   };
 }
 

@@ -217,3 +217,17 @@ test('обувь подбирается первой и закрывает по�
   const pinnedShoe = buildCapsule(pool, days, {luggage: 'carryon', pinned: ['n993']});
   assert.ok(pinnedShoe.ids.includes('n993'));
 });
+
+test('если все тёплые слои заменены, капсула подсказывает, что вернуть', () => {
+  const excluded = ['tra', 'swd', 'swf', 'sws', 'tu', 'tuv', 'swl', 'ssm'];
+  const days = [6, 9, 9, 10].map((t) => ({t, season: 'autumn'}));
+  const capsule = buildCapsule(pool, days, {luggage: 'carryon', excluded});
+  assert.deepEqual(
+    capsule.replacedGaps.map((c) => c.t),
+    [6, 9],
+  );
+  assert.ok(capsule.restore.length > 0);
+  assert.ok(capsule.restore.every((id) => excluded.includes(id)));
+  const pinnedFull = buildCapsule(pool, days, {luggage: 'carryon', pinned: ['ssc', 'r1', 'r2']});
+  assert.ok(pinnedFull.gaps.length === 0 || pinnedFull.pinBlocked.includes('m'));
+});
