@@ -25,6 +25,12 @@ export const SLOT_TITLES = {
   sc: 'Шарф',
 };
 
+/**
+ * Вещи, которые в поездку не берутся для каждого дня: тяжёлые, долго в них не походишь.
+ * Попадают в капсулу только под официальное мероприятие (свадьба и т.п.), отдельно от лимитов и плана по дням.
+ */
+export const EVENT_ONLY = ['tim'];
+
 /** Самый холодный и самый тёплый день, которые умеет собрать гардероб. */
 export const TRIP_LIMITS = [0, 32];
 
@@ -114,7 +120,7 @@ export function tripOutfits(pool, conditions) {
  */
 export function buildCapsule(pool, days, options = {}) {
   const limits = {...LUGGAGE[options.luggage || 'cabin']};
-  const excluded = new Set(options.excluded || []);
+  const excluded = new Set([...(options.excluded || []), ...EVENT_ONLY]);
   const pinned = (options.pinned || []).filter((id) => pool.items[id] && !excluded.has(id));
   const conditions = uniqueConditions(days);
   const outfits = tripOutfits(pool, conditions).filter((outfit) => outfit.ids.every((id) => !excluded.has(id)));
@@ -337,12 +343,14 @@ export function buildCapsule(pool, days, options = {}) {
     temps.filter((t) => t <= 10),
   );
   [...head, ...scarves].forEach((id) => chosen.add(id));
+  const eventItems = options.event ? EVENT_ONLY.filter((id) => pool.items[id]) : [];
 
   const finalCovered = coveredSet();
   return {
     conditions,
     limits,
-    ids: [...chosen],
+    ids: [...chosen, ...eventItems],
+    eventItems,
     outfits: capsuleOutfits,
     gaps: conditions.filter((_, index) => !finalCovered.has(index)),
     impossible: conditions.filter((_, index) => !outfits.some((outfit) => outfit.conds.has(index))),

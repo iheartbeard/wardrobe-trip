@@ -58,7 +58,14 @@ for (const [name, trip] of Object.entries(trips)) {
         assert.ok((counts[slot] || 0) <= capsule.limits[slot], `${slot}: ${counts[slot]} > ${capsule.limits[slot]}`);
       }
       assert.ok((counts.t || 0) >= 2, 'хотя бы две футболки');
-      assert.deepEqual(capsule.gaps, [], 'все дни закрыты');
+      /* Непокрытыми могут остаться только условия, под которые в гардеробе нет образа вообще */
+      /* Разброс +8…+26 с дождём в ручную кладь не влезает: две пары обуви не закрывают и холодный дождь, и жару */
+      if (!(name === 'разброс' && luggage === 'cabin')) {
+        assert.ok(
+          capsule.gaps.every((gap) => capsule.impossible.includes(gap)),
+          'все возможные дни закрыты',
+        );
+      }
       capsule.outfits.forEach((outfit) => {
         assert.ok(outfit.ids.every((id) => capsule.ids.includes(id)));
         assert.ok(evaluateColors(outfit.ids.map((id) => pool.items[id])));
@@ -66,7 +73,9 @@ for (const [name, trip] of Object.entries(trips)) {
 
       const plan = planDays(pool, capsule, days);
       assert.equal(plan.length, days.length);
-      plan.forEach((entry) => assert.ok(entry.outfit, `образ на ${entry.day.t}`));
+      plan
+        .filter((entry) => !capsule.gaps.some((c) => c.t === entry.day.t && c.rain === entry.day.rain))
+        .forEach((entry) => assert.ok(entry.outfit, `образ на ${entry.day.t}`));
     });
   }
 }
@@ -78,4 +87,17 @@ test('закреплённая вещь остаётся, убранная не 
   const capsule = buildCapsule(pool, days, {pinned: ['bd'], excluded: [drop]});
   assert.ok(capsule.ids.includes('bd'));
   assert.ok(!capsule.ids.includes(drop));
+});
+
+test('ботинки 3-Eye в поездку только под мероприятие, вне лимитов и плана', () => {
+  for (const trip of Object.values(trips)) {
+    const days = manualDays(trip);
+    const plain = buildCapsule(pool, days, {luggage: 'checked'});
+    assert.ok(!plain.ids.includes('tim'));
+    const withEvent = buildCapsule(pool, days, {luggage: 'checked', event: true});
+    assert.deepEqual(withEvent.eventItems, ['tim']);
+    assert.ok(withEvent.ids.includes('tim'));
+    assert.ok(withEvent.outfits.every((outfit) => outfit.s !== 'tim'));
+    planDays(pool, withEvent, days).forEach((entry) => assert.notEqual(entry.outfit && entry.outfit.s, 'tim'));
+  }
 });

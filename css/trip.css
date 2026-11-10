@@ -339,3 +339,7 @@
     padding: 10px 8px;
   }
 }
+
+.tick--flat {
+  padding-bottom: 0;
+}
