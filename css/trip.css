@@ -344,18 +344,6 @@
   padding-bottom: 0;
 }
 
-.road {
-  font-size: 11px;
-  color: var(--fg);
-  background: var(--sel);
-  border-radius: 999px;
-  padding: 1px 8px;
-  margin-left: auto;
-}
-.road + .rainy {
-  margin-left: 0;
-}
-
 .checklist .pack-h {
   font-size: 12px;
   letter-spacing: 0.06em;

@@ -37,7 +37,6 @@ const defaults = () => {
     manual: {days: 7, tmin: 12, tmax: 20, rain: false},
     luggage: DEFAULT_LUGGAGE,
     event: false,
-    travelShoes: true,
     built: false,
     pinned: [],
     excluded: [],
@@ -118,7 +117,6 @@ function fillInputs() {
   $('tmax').value = state.manual.tmax;
   $('rain').checked = state.manual.rain;
   $('event').checked = state.event;
-  $('travel-shoes').checked = state.travelShoes;
 }
 
 function readForm() {
@@ -233,7 +231,6 @@ function rebuild() {
     const capsule = buildCapsule(pool, days, {
       luggage: state.luggage,
       event: state.event,
-      travelShoes: state.travelShoes,
       pinned: state.pinned,
       excluded: state.excluded,
     });
@@ -250,8 +247,7 @@ function rebuild() {
 
 /** В дорогу надевается самое тёплое: куртка и обувь с самой низкой нижней границей. */
 /** Вещи сверх лимитов: под мероприятие и для дороги. */
-const extraTag = (capsule, id) =>
-  capsule.eventItems.includes(id) ? 'для мероприятия' : capsule.travelItems.includes(id) ? 'только в дорогу' : '';
+const extraTag = (capsule, id) => (capsule.eventItems.includes(id) ? 'для мероприятия' : '');
 
 function travelWear(capsule) {
   const lowest = (slot, low) =>
@@ -259,7 +255,7 @@ function travelWear(capsule) {
       .filter((id) => pool.items[id].slot === slot && !extraTag(capsule, id))
       .sort((a, b) => low(pool.items[a]) - low(pool.items[b]))[0];
   const shoeLow = (s) => Math.min(...[s.dry, s.rain].filter(Boolean).map((r) => r[0]));
-  const shoe = capsule.travelItems[0] || lowest('s', shoeLow);
+  const shoe = lowest('s', shoeLow);
   return [lowest('o', (o) => o.minTemp), shoe].filter(Boolean);
 }
 
@@ -358,11 +354,10 @@ function renderCapsule(capsule) {
 
 function renderPlan(plan) {
   $('plan').innerHTML = plan
-    .map(({day, outfit, shoe, travel, tee, head, scarf}, index) => {
+    .map(({day, outfit, shoe, tee, head, scarf}, index) => {
       const title = day.date ? weekday(day.date) : `День ${index + 1}`;
       const range = day.tmin != null ? `<small>${formatTemp(day.tmin)}…${formatTemp(day.tmax)}</small>` : '';
-      const badge =
-        (travel ? '<span class="road">в дороге</span>' : '') + (day.rain ? '<span class="rainy">дождь</span>' : '');
+      const badge = day.rain ? '<span class="rainy">дождь</span>' : '';
       if (!outfit) {
         return `<article class="day"><header><b>${esc(title)}</b><span class="t">${formatTemp(day.t)}°${range}</span>${badge}</header><p class="note">Нет образа из капсулы на эту погоду.</p></article>`;
       }
@@ -510,13 +505,6 @@ function bind() {
     save();
   });
   /* Даты и ручная погода запоминаются сразу, без нажатия «Собрать капсулу» */
-  $('travel-shoes').addEventListener('change', () => {
-    state.travelShoes = $('travel-shoes').checked;
-    save();
-    if (lastCapsule) {
-      rebuild();
-    }
-  });
   $('event').addEventListener('change', () => {
     state.event = $('event').checked;
     save();

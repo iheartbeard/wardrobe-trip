@@ -38,11 +38,8 @@ export const SLOT_TITLES = {
  */
 export const EVENT_ONLY = ['tim'];
 
-/** Неудобная для долгой ходьбы обувь в поездку не берётся: слипоны, Palermo, Wallabee. Club C удобные, они остаются. */
-export const NOT_FOR_WALKING = ['van', 'pal', 'w1', 'w2'];
-
-/** Обувь только на дни в дороге (поезд, самолёт, автобус): первый и последний день поездки. */
-export const TRAVEL_ONLY = ['bos'];
+/** Неудобная для долгой ходьбы обувь в поездку не берётся: слипоны, Palermo, Wallabee, Birkenstock Boston. Club C удобные, они остаются. */
+export const NOT_FOR_WALKING = ['van', 'pal', 'w1', 'w2', 'bos'];
 
 /** Самый холодный и самый тёплый день, которые умеет собрать гардероб. */
 export const TRIP_LIMITS = [0, 32];
@@ -133,7 +130,7 @@ export function tripOutfits(pool, conditions) {
  */
 export function buildCapsule(pool, days, options = {}) {
   const limits = {...(LUGGAGE[options.luggage] || LUGGAGE[DEFAULT_LUGGAGE])};
-  const excluded = new Set([...(options.excluded || []), ...EVENT_ONLY, ...NOT_FOR_WALKING, ...TRAVEL_ONLY]);
+  const excluded = new Set([...(options.excluded || []), ...EVENT_ONLY, ...NOT_FOR_WALKING]);
   const pinned = (options.pinned || []).filter((id) => pool.items[id] && !excluded.has(id));
   const conditions = uniqueConditions(days);
   const outfits = tripOutfits(pool, conditions).filter((outfit) => outfit.ids.every((id) => !excluded.has(id)));
@@ -160,9 +157,6 @@ export function buildCapsule(pool, days, options = {}) {
   });
   limits.t = Math.min(limits.t, Math.max(2, days.length, pinnedCounts.t));
   /* Пара только для дороги входит в те же 2–3 пары, поэтому на ходьбу остаётся на одну меньше */
-  /* С одной парой обуви ехать можно только в ней же, отдельной пары для дороги нет */
-  const travelItems = options.travelShoes && limits.s > 1 ? TRAVEL_ONLY.filter((id) => pool.items[id]) : [];
-  limits.s = Math.max(1, limits.s - travelItems.length);
 
   /* Холодные дни определяют куртку и низ, жаркие лёгкие вещи, поэтому пробуем несколько порядков и берём лучший */
   const optionCount = conditions.map((_, index) => outfits.filter((o) => o.conds.has(index)).length);
@@ -373,10 +367,9 @@ export function buildCapsule(pool, days, options = {}) {
   const finalCovered = coveredSet();
   return {
     conditions,
-    limits: {...limits, s: limits.s + travelItems.length},
-    ids: [...chosen, ...eventItems, ...travelItems],
+    limits,
+    ids: [...chosen, ...eventItems],
     eventItems,
-    travelItems,
     outfits: capsuleOutfits,
     gaps: conditions.filter((_, index) => !finalCovered.has(index)),
     impossible: conditions.filter((_, index) => !outfits.some((outfit) => outfit.conds.has(index))),
@@ -398,8 +391,7 @@ export function planDays(pool, capsule, days) {
   const scarves = capsule.ids.filter((id) => pool.items[id].slot === 'sc');
   let previous = null;
 
-  return days.map((day, dayIndex) => {
-    const travel = capsule.travelItems.length > 0 && (dayIndex === 0 || dayIndex === days.length - 1);
+  return days.map((day) => {
     const condIndex = capsule.conditions.findIndex((c) => c.t === clampTemp(day.t) && c.rain === !!day.rain);
     const options = capsule.outfits.filter((outfit) => outfit.conds.has(condIndex));
     let best = null;
@@ -421,7 +413,7 @@ export function planDays(pool, capsule, days) {
       }
     });
     if (!best) {
-      return {day, outfit: null, shoe: null, travel, tee: null, head: null, scarf: null};
+      return {day, outfit: null, shoe: null, tee: null, head: null, scarf: null};
     }
     usedKey.add(best.ids.join('|'));
     [best.m, best.b, best.o, best.s].forEach((id) => {
@@ -448,8 +440,7 @@ export function planDays(pool, capsule, days) {
     return {
       day,
       outfit: best,
-      shoe: travel ? capsule.travelItems[0] : best.s,
-      travel,
+      shoe: best.s,
       tee,
       head: fitting(heads),
       scarf: t <= 10 ? fitting(scarves) : null,

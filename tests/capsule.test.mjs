@@ -110,29 +110,3 @@ test('слипоны и Palermo в поездку не предлагаются'
     }
   }
 });
-
-test('Birkenstock Boston только на дни в дороге', () => {
-  const days = manualDays(trips.осень);
-  const capsule = buildCapsule(pool, days, {travelShoes: true});
-  assert.deepEqual(capsule.travelItems, ['bos']);
-  assert.ok(capsule.outfits.every((outfit) => outfit.s !== 'bos'));
-  const plan = planDays(pool, capsule, days);
-  plan.forEach((entry, i) => {
-    const road = i === 0 || i === plan.length - 1;
-    assert.equal(entry.travel, road);
-    assert.equal(entry.shoe === 'bos', road);
-  });
-  assert.ok(!buildCapsule(pool, days).ids.includes('bos'));
-});
-
-test('пара для дороги входит в лимит обуви', () => {
-  for (const luggage of Object.keys(LUGGAGE)) {
-    const capsule = buildCapsule(pool, manualDays(trips.осень), {luggage, travelShoes: true});
-    const shoes = capsule.ids.filter((id) => capsuleSlot(pool.items[id]) === 's');
-    assert.ok(shoes.length <= LUGGAGE[luggage].s, `${luggage}: ${shoes.length}`);
-    assert.equal(capsule.limits.s, LUGGAGE[luggage].s);
-    if (LUGGAGE[luggage].s === 1) {
-      assert.deepEqual(capsule.travelItems, [], 'с одной парой отдельной пары для дороги нет');
-    }
-  }
-});
