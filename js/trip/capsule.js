@@ -31,8 +31,8 @@ export const SLOT_TITLES = {
  */
 export const EVENT_ONLY = ['tim'];
 
-/** Кеды и слипоны в поездку не берутся: ходить много, нужна обувь с нормальной амортизацией. */
-export const NOT_FOR_WALKING = ['rc', 'van', 'pal'];
+/** Слипоны и плоские кеды в поездку не берутся: ходить много. Club C удобные, они остаются. */
+export const NOT_FOR_WALKING = ['van', 'pal'];
 
 /** Самый холодный и самый тёплый день, которые умеет собрать гардероб. */
 export const TRIP_LIMITS = [0, 32];

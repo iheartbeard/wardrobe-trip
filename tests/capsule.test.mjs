@@ -102,11 +102,11 @@ test('ботинки 3-Eye в поездку только под меропри�
   }
 });
 
-test('кеды и слипоны в поездку не предлагаются', () => {
+test('слипоны и Palermo в поездку не предлагаются', () => {
   for (const trip of Object.values(trips)) {
     for (const luggage of Object.keys(LUGGAGE)) {
-      const capsule = buildCapsule(pool, manualDays(trip), {luggage, pinned: ['rc']});
-      assert.ok(['rc', 'van', 'pal'].every((id) => !capsule.ids.includes(id)));
+      const capsule = buildCapsule(pool, manualDays(trip), {luggage, pinned: ['van']});
+      assert.ok(['van', 'pal'].every((id) => !capsule.ids.includes(id)));
     }
   }
 });
