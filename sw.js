@@ -1,5 +1,5 @@
 /* Service worker капсулы: страница поездки работает без сети. Общие модули берутся из корня сайта. */
-const CACHE_VERSION = 'kapsula-v30';
+const CACHE_VERSION = 'kapsula-v31';
 
 const APP_FILES = [
   './',
@@ -27,6 +27,7 @@ const APP_FILES = [
   '../wardrobe-fits/js/data/winter.js',
   '../wardrobe-fits/js/data/looks.js',
   '../wardrobe-fits/js/data/wada.js',
+  '../wardrobe-fits/js/data/colors.js',
 ];
 
 const FONT_HOST = /fonts\.(googleapis|gstatic)\.com$/;

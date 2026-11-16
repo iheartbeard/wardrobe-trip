@@ -300,10 +300,6 @@
   font-style: normal;
   color: var(--muted);
 }
-.day .dots i {
-  width: 22px;
-  height: 22px;
-}
 
 .pack {
   padding-bottom: 40px;

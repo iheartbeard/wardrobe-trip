@@ -8,4 +8,4 @@ export {SEASONS} from '../../../wardrobe-fits/js/data/seasons.js';
 export {buildModel, lookMask} from '../../../wardrobe-fits/js/model.js';
 export {evaluateColors} from '../../../wardrobe-fits/js/lib/color.js';
 export {formatTemp} from '../../../wardrobe-fits/js/lib/temperature.js';
-export {esc} from '../../../wardrobe-fits/js/ui/templates.js';
+export {esc, swatchBackground} from '../../../wardrobe-fits/js/ui/templates.js';

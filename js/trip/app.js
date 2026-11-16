@@ -3,7 +3,7 @@
  * план по дням и чек-лист сборов. Состояние хранится в localStorage, поэтому собранная капсула
  * открывается и без сети.
  */
-import {esc, formatTemp} from './wardrobe.js';
+import {esc, formatTemp, swatchBackground} from './wardrobe.js';
 import {
   DEFAULT_LUGGAGE,
   LUGGAGE,
@@ -92,10 +92,13 @@ const status = (text) => {
   $('status').textContent = text;
 };
 
-const dot = (item) =>
-  `<span class="dot${item.hex ? '' : ' nc'}"${item.hex ? ` style="--swatch:${esc(item.hex)}"` : ''}></span>`;
-const miniDot = (item) =>
-  `<i class="cd${item.hex ? '' : ' nc'}"${item.hex ? ` style="--swatch:${esc(item.hex)}"` : ''}></i>`;
+/* Плашки цвета как в основном проекте: основной цвет и заметные детали (colors.js там же) */
+const swatchStyle = (item) => {
+  const background = swatchBackground(item);
+  return background ? ` style="--swatch:${esc(background)}"` : '';
+};
+const dot = (item) => `<span class="dot${item.hex ? '' : ' nc'}"${swatchStyle(item)}></span>`;
+const miniDot = (item) => `<i class="cd${item.hex ? '' : ' nc'}"${swatchStyle(item)}></i>`;
 
 const PIN_ICON =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l-1 6 4 4v2h-5v6l-1 1-1-1v-6H6v-2l4-4z" fill="currentColor"/></svg>';
