@@ -43,7 +43,8 @@ const defaults = () => {
     travelShoe: '',
     built: false,
     pinned: [],
-    excluded: [],
+    /* Перебор вариантов по группам: какие вещи уже показаны и пропущены в текущем круге */
+    cycle: {},
     packed: [],
     weather: null,
   };
@@ -69,6 +70,11 @@ function load() {
       saved.bags = {backpack: true, suitcase: saved.luggage !== 'backpack'};
     }
     saved.luggage = luggageFor(saved.bags);
+    /* Раньше заменённые вещи копились в отдельном списке; теперь варианты перебираются по кругу */
+    delete saved.excluded;
+    if (!saved.cycle || typeof saved.cycle !== 'object') {
+      saved.cycle = {};
+    }
     return saved;
   } catch {
     return defaults();
@@ -312,21 +318,58 @@ async function submit() {
   rebuild();
 }
 
-function rebuild() {
+const cycleExcluded = (cycle) => Object.values(cycle).flat();
+
+function compute(days, cycle) {
+  pool = pool || buildPool();
+  return buildCapsule(pool, days, {
+    luggage: state.luggage,
+    event: state.event,
+    travelShoe: state.travelShoe,
+    pinned: state.pinned,
+    excluded: cycleExcluded(cycle),
+  });
+}
+
+const slotCount = (capsule, slot) => capsule.ids.filter((id) => capsuleSlot(pool.items[id]) === slot).length;
+
+/**
+ * Пересборка капсулы. swap — вещь, на которой нажали «Следующий вариант»: она пропускается в этом круге,
+ * и в её группу приходит следующий вариант. Когда подходящих вариантов не остаётся, круг начинается заново
+ * с первого варианта. Закрепление вещи завершает перебор в её группе.
+ */
+function rebuild(swap = null) {
   const days = tripDays();
   if (!days.length) {
     return;
   }
   status('Собираю капсулу…');
   setTimeout(() => {
-    pool = pool || buildPool();
-    const capsule = buildCapsule(pool, days, {
-      luggage: state.luggage,
-      event: state.event,
-      travelShoe: state.travelShoe,
-      pinned: state.pinned,
-      excluded: state.excluded,
-    });
+    let capsule;
+    if (swap && lastCapsule) {
+      const slot = capsuleSlot(pool.items[swap]);
+      const before = lastCapsule;
+      const next = {...state.cycle, [slot]: [...(state.cycle[slot] || []), swap]};
+      capsule = compute(days, next);
+      const exhausted =
+        capsule.replacedGaps.length > 0 ||
+        capsule.gaps.length > before.gaps.length ||
+        slotCount(capsule, slot) < slotCount(before, slot);
+      if (exhausted) {
+        /* Варианты в группе закончились: по кругу к первому */
+        state.cycle = {...state.cycle, [slot]: []};
+        capsule = compute(days, state.cycle);
+      } else {
+        state.cycle = next;
+      }
+    } else {
+      capsule = compute(days, state.cycle);
+      if (capsule.replacedGaps.length && cycleExcluded(state.cycle).length) {
+        /* После смены дат, погоды или багажа пропущенные варианты могут понадобиться снова */
+        state.cycle = {};
+        capsule = compute(days, state.cycle);
+      }
+    }
     const plan = planDays(pool, capsule, days);
     state.packed = state.packed.filter((id) => capsule.ids.includes(id));
     state.built = true;
@@ -449,7 +492,7 @@ function renderCapsule(capsule) {
             `<div class="card tcard${pinned ? ' pinned' : ''}">${dot(item)}<span class="nm">${esc(item.name)}</span>` +
             `<span class="meta"><span>${esc(item.colorName)}</span>${tags.map((t) => `<span class="tg">${esc(t)}</span>`).join('')}</span>` +
             `<span class="acts"><button type="button" class="ib" data-pin="${esc(item.id)}" aria-pressed="${pinned}" aria-label="${pinned ? 'Открепить' : 'Закрепить'}: ${esc(item.name)}" title="${pinned ? 'Открепить' : 'Беру точно'}">${PIN_ICON}</button>` +
-            `<button type="button" class="ib" data-ex="${esc(item.id)}" aria-label="Заменить: ${esc(item.name)}" title="Заменить">${SWAP_ICON}</button></span></div>`
+            `<button type="button" class="ib" data-ex="${esc(item.id)}" aria-label="Следующий вариант вместо: ${esc(item.name)}" title="Следующий вариант">${SWAP_ICON}</button></span></div>`
           );
         })
         .join('');
@@ -462,15 +505,6 @@ function renderCapsule(capsule) {
         : '';
       return `<div class="grp"><h3>${SLOT_TITLES[slot]}${counter}</h3><div class="cards">${cards}</div></div>`;
     })
-    .join('');
-
-  const excluded = state.excluded.filter((id) => pool.items[id]);
-  $('excluded-wrap').hidden = !excluded.length;
-  $('excluded').innerHTML = excluded
-    .map(
-      (id) =>
-        `<button type="button" class="chip chip--btn" data-back="${esc(id)}" title="Вернуть">${miniDot(pool.items[id])}${esc(pool.items[id].name)} ↺</button>`,
-    )
     .join('');
 }
 
@@ -656,28 +690,26 @@ function bind() {
     const pin = event.target.closest('[data-pin]');
     const ex = event.target.closest('[data-ex]');
     if (pin) {
-      state.pinned = toggle(state.pinned, pin.dataset.pin);
+      const id = pin.dataset.pin;
+      state.pinned = toggle(state.pinned, id);
+      if (state.pinned.includes(id)) {
+        /* Выбор сделан: перебор в этой группе закончен */
+        state.cycle = {...state.cycle, [capsuleSlot(pool.items[id])]: []};
+      }
+      save();
+      rebuild();
     } else if (ex) {
-      state.excluded = [...state.excluded, ex.dataset.ex];
       state.pinned = state.pinned.filter((id) => id !== ex.dataset.ex);
-    } else {
-      return;
+      save();
+      rebuild(ex.dataset.ex);
     }
-    save();
-    rebuild();
   });
   $('gaps').addEventListener('click', (event) => {
     const back = event.target.closest('[data-back]');
     if (back) {
-      state.excluded = state.excluded.filter((id) => id !== back.dataset.back);
-      save();
-      rebuild();
-    }
-  });
-  $('excluded').addEventListener('click', (event) => {
-    const back = event.target.closest('[data-back]');
-    if (back) {
-      state.excluded = state.excluded.filter((id) => id !== back.dataset.back);
+      state.cycle = Object.fromEntries(
+        Object.entries(state.cycle).map(([slot, ids]) => [slot, ids.filter((id) => id !== back.dataset.back)]),
+      );
       save();
       rebuild();
     }
