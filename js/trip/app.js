@@ -110,6 +110,8 @@ const miniDot = (item) => `<i class="cd${item.hex ? '' : ' nc'}"${swatchStyle(it
 
 const PIN_ICON =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l-1 6 4 4v2h-5v6l-1 1-1-1v-6H6v-2l4-4z" fill="currentColor"/></svg>';
+const DROP_ICON =
+  '<svg viewBox="0 0 12 16" aria-hidden="true"><path d="M6 1C6 1 1.5 7 1.5 10.2A4.5 4.5 0 0 0 10.5 10.2C10.5 7 6 1 6 1Z" fill="currentColor"/></svg>';
 const SWAP_ICON =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
@@ -282,7 +284,6 @@ function renderWeatherPreview() {
   const days = w.days;
   const highs = days.map((d) => d.tmax);
   const lows = days.map((d) => d.tmin);
-  const rainy = days.filter((d) => d.rain).length;
   const seasons = [...new Set(days.map((d) => SEASON_LABELS[seasonOf(d.date)]))].join(' и ').toLowerCase();
   const fetched = w.fetchedAt
     ? `, обновлён ${new Date(w.fetchedAt).toLocaleString('ru-RU', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'})}`
@@ -291,26 +292,30 @@ function renderWeatherPreview() {
     w.source === 'forecast'
       ? `прогноз Open-Meteo${fetched}`
       : `ориентир по тем же датам ${w.year} года, прогноза так далеко ещё нет${fetched}`;
-  const rainDays = days
-    .filter((d) => d.rain)
-    .map(
-      (d) =>
-        `<span class="wx-day">${esc(weekday(d.date))}${d.probability != null ? `<span class="wx-pct">${d.probability}%</span>` : ''}</span>`,
-    )
-    .join('');
   const range = (list) => `${formatTemp(Math.min(...list))}…${formatTemp(Math.max(...list))} °C`;
-  const rainLabel = rainy
-    ? `${rainy} ${rainy === 1 ? 'день' : rainy < 5 ? 'дня' : 'дней'} из ${days.length}`
-    : 'не ожидается';
+  /* Лента дней: день недели и число, температура днём и ночью, капля с вероятностью у дождливых */
+  const strip = days
+    .map((d) => {
+      const date = new Date(`${d.date}T12:00:00`);
+      const wd = date.toLocaleDateString('ru-RU', {weekday: 'short'});
+      const label = `${weekday(d.date)}: днём ${formatTemp(d.tmax)}, ночью ${formatTemp(d.tmin)}${d.rain ? `, дождь${d.probability != null ? ` ${d.probability}%` : ''}` : ''}`;
+      return (
+        `<li class="wx-cell${d.rain ? ' wet' : ''}" aria-label="${esc(label)}">` +
+        `<span class="wx-wd">${esc(wd)}</span><span class="wx-dn">${date.getDate()}</span>` +
+        `<span class="wx-hi">${formatTemp(d.tmax)}°</span><span class="wx-lo">${formatTemp(d.tmin)}°</span>` +
+        `<span class="wx-rain">${d.rain ? `${DROP_ICON}${d.probability != null ? `${d.probability}%` : ''}` : ''}</span></li>`
+      );
+    })
+    .join('');
   box.hidden = false;
   box.innerHTML =
     `<div class="wx-head"><b>${esc(placeLabel(state.place))}</b><span>${esc(weekday(w.start))} — ${esc(weekday(w.end))}</span></div>` +
     '<dl class="wx-rows">' +
     `<dt>Днём</dt><dd>${range(highs)}</dd>` +
     `<dt>Ночью</dt><dd>${range(lows)}</dd>` +
-    `<dt>Дождь</dt><dd>${rainLabel}${rainDays ? `<span class="wx-days">${rainDays}</span>` : ''}</dd>` +
     `<dt>Сезон</dt><dd>${esc(seasons)}</dd>` +
     '</dl>' +
+    `<div class="wx-strip-wrap"><ol class="wx-strip" aria-label="Погода по дням">${strip}</ol></div>` +
     `<small>Ощущаемая температура, ${esc(source)}</small>`;
 }
 

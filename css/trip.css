@@ -413,21 +413,67 @@
   font-variant-numeric: tabular-nums;
   min-width: 0;
 }
-.wx-days {
+/* Лента дней: на длинной поездке прокручивается внутри блока, страница не уезжает вбок */
+.wx-strip-wrap {
+  overflow-x: auto;
+  margin-inline: -14px;
+  padding-inline: 14px;
+  scrollbar-width: thin;
+}
+.wx-strip {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: grid;
-  gap: 2px;
-  margin-top: 4px;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(48px, 1fr);
+  gap: 6px;
 }
-.wx-day {
+.wx-cell {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  padding: 8px 4px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+.wx-cell.wet {
+  border-color: color-mix(in srgb, var(--rain) 55%, var(--line));
+}
+.wx-wd {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.wx-dn {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.wx-hi {
+  font-weight: 600;
+  font-size: 15px;
+}
+.wx-lo {
+  font-size: 12px;
+  color: var(--muted);
+}
+.wx-rain {
   display: flex;
-  gap: 8px;
-  align-items: baseline;
-  white-space: nowrap;
-}
-.wx-pct {
+  align-items: center;
+  gap: 2px;
+  min-height: 16px;
+  margin-top: 4px;
   color: var(--rain);
   font-family: var(--f-mono);
-  font-size: 12px;
+  font-size: 11px;
+}
+.wx-rain svg {
+  width: 8px;
+  height: 11px;
 }
 .wx-preview small {
   color: var(--muted);
