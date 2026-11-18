@@ -24,18 +24,20 @@ const SLOT_ORDER = ['s', 'o', 'm', 't', 'b', 'h', 'sc'];
 const doc = document;
 const $ = (id) => doc.getElementById(id);
 
+/** Сегодняшняя дата по местному времени, YYYY-MM-DD. */
+const todayIso = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+/* По умолчанию поездка начинается сегодня, дату возвращения выбираешь сам */
 const defaults = () => {
-  const start = new Date();
-  start.setDate(start.getDate() + 7);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 6);
-  const iso = (d) => d.toISOString().slice(0, 10);
   return {
     mode: 'place',
     query: '',
     place: null,
-    start: iso(start),
-    end: iso(end),
+    start: todayIso(),
+    end: '',
     manual: {days: 7, tmin: 12, tmax: 20, rain: false},
     luggage: DEFAULT_LUGGAGE,
     bags: {backpack: true, suitcase: true},
@@ -143,6 +145,7 @@ function fillInputs() {
   $('q').value = state.place ? placeLabel(state.place) : state.query;
   $('start').value = state.start;
   $('end').value = state.end;
+  $('end').min = state.start || '';
   $('days').value = state.manual.days;
   $('tmin').value = state.manual.tmin;
   $('tmax').value = state.manual.tmax;
@@ -310,7 +313,7 @@ async function submit() {
       return;
     }
     if (!state.start || !state.end || state.end < state.start) {
-      status('Проверь даты поездки.');
+      status(state.end ? 'Дата возвращения раньше даты отъезда.' : 'Выбери дату возвращения.');
       return;
     }
     status('Смотрю погоду…');
@@ -685,6 +688,8 @@ function bind() {
     if (event.target.matches('#start, #end, #days, #tmin, #tmax, #rain')) {
       readForm();
       save();
+      /* В календаре возвращения нельзя выбрать дату раньше отъезда */
+      $('end').min = state.start || '';
       if (event.target.matches('#start, #end') && state.place) {
         refreshWeather();
       }
