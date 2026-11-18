@@ -145,9 +145,37 @@ test('ручные дни и даты', () => {
   assert.deepEqual(dateRange('2026-12-30', '2027-01-02'), ['2026-12-30', '2026-12-31', '2027-01-01', '2027-01-02']);
 });
 
-test('Double Knee в поездки не берутся, даже закреплённые', () => {
+test('Double Knee и Universal Works в поездки не берутся, даже закреплённые', () => {
   for (const trip of Object.values(trips)) {
-    const capsule = buildCapsule(pool, manualDays(trip), {luggage: 'carryon', pinned: ['bd']});
-    assert.ok(!capsule.ids.includes('bd'));
+    const capsule = buildCapsule(pool, manualDays(trip), {luggage: 'carryon', pinned: ['bd', 'bu']});
+    assert.ok(!capsule.ids.includes('bd') && !capsule.ids.includes('bu'));
   }
+});
+
+test('план по дням чередует штаны: ни одна пара не повторяется, пока есть другие', () => {
+  for (const trip of Object.values(trips)) {
+    const days = manualDays({...trip, days: 6});
+    const capsule = buildCapsule(pool, days, {luggage: 'carryon'});
+    const plan = planDays(pool, capsule, days);
+    const uses = {};
+    plan.forEach((entry) => {
+      uses[entry.outfit.b] = (uses[entry.outfit.b] || 0) + 1;
+    });
+    const counts = Object.values(uses);
+    const bottoms = ofSlot(capsule, 'b').length;
+    /* Если каждая пара подходит под погоду, разница в использовании не больше 1 */
+    const everyDayAll = capsule.conditions.every((_, i) =>
+      ofSlot(capsule, 'b').every((b) => capsule.outfits.some((o) => o.conds.has(i) && o.b === b)),
+    );
+    if (everyDayAll) {
+      assert.equal(Object.keys(uses).length, Math.min(bottoms, days.length));
+      assert.ok(Math.max(...counts) - Math.min(...counts) <= 1, JSON.stringify(uses));
+    }
+  }
+});
+
+test('закреплённые штаны, которые не подходят по погоде, отмечены', () => {
+  const days = [9, 8, 7].map((t) => ({t, season: 'autumn'}));
+  const capsule = buildCapsule(pool, days, {luggage: 'carryon', pinned: ['g2', 'be']});
+  assert.deepEqual(capsule.unusedPinned, ['g2']);
 });

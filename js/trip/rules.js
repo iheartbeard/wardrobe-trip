@@ -5,8 +5,8 @@
 export const TRIP_RULES = {
   /* Неудобно много ходить: слипоны, плоские Palermo, Wallabee, Birkenstock Boston */
   notForWalking: ['van', 'pal', 'w1', 'w2', 'bos'],
-  /* Никогда не берутся в поездки: слишком тяжёлые (Carhartt WIP Double Knee) */
-  neverPack: ['bd'],
+  /* Никогда не берутся в поездки: Carhartt WIP Double Knee (слишком тяжёлые), Universal Works Pleated Track */
+  neverPack: ['bd', 'bu'],
   /* Только под официальное мероприятие (свадьба и т.п.), сверх лимита и вне плана по дням */
   eventOnly: ['tim'],
   /* Джинсы тяжелее и занимают больше места: берутся, только если подходят лучше остального, максимум 2 пары */

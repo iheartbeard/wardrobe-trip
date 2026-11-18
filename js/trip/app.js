@@ -480,6 +480,12 @@ function renderStats(capsule, days) {
       )
       .join('');
   }
+  if (capsule.unusedPinned.length) {
+    const names = capsule.unusedPinned.map((id) => `${pool.items[id].name} ${pool.items[id].colorName}`).join(', ');
+    lines.push(
+      `Закреплено, но не подходит ни под один день поездки по погоде: ${names}. Эти вещи в план по дням не попадут, их можно открепить.`,
+    );
+  }
   if (capsule.pinBlocked.length) {
     const groups = capsule.pinBlocked.map((slot) => `«${SLOT_TITLES[slot]}»`).join(', ');
     lines.push(`Места в ${groups} заняты закреплёнными вещями, и для части дней не подходит ни одна. Открепи одну.`);

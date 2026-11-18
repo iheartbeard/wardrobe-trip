@@ -543,6 +543,11 @@ export function buildCapsule(pool, days, options = {}) {
     replacedGaps: replacedIdx.map((i) => conditions[i]),
     restore,
     pinBlocked: [...pinBlocked],
+    /* Закреплённые вещи, которые не входят ни в один образ на дни поездки (не по погоде или не сочетаются) */
+    unusedPinned: pinned.filter(
+      (id) =>
+        ['o', 'm', 'b', 's'].includes(capsuleSlot(pool.items[id])) && !capsuleOutfits.some((o) => o.ids.includes(id)),
+    ),
   };
 }
 
@@ -570,11 +575,15 @@ export function planDays(pool, capsule, days) {
     let pickValue = -Infinity;
     options.forEach((outfit) => {
       const key = outfit.ids.join('|');
-      let value = outfit.score * 2;
-      value -= (used[outfit.m] || 0) * 3 + (used[outfit.b] || 0) * 2 + (used[outfit.o] || 0) * 0.5;
-      value -= (used[outfit.s] || 0) * 1;
+      /*
+       * Сначала разнообразие, потом цвет: штаны и средний слой чередуются по кругу (каждый повтор стоит
+       * больше любой разницы в оценке цвета), затем обувь; оценка цвета решает только между равными.
+       */
+      let value = outfit.score;
+      value -= (used[outfit.b] || 0) * 20 + (used[outfit.m] || 0) * 15 + (used[outfit.s] || 0) * 6;
+      value -= (used[outfit.o] || 0) * 0.5;
       if (usedKey.has(key)) {
-        value -= 6;
+        value -= 40;
       }
       if (previous && previous.s === outfit.s) {
         value -= 1.5;
