@@ -250,7 +250,7 @@ async function refreshWeather() {
     if (token !== weatherToken) {
       return false;
     }
-    state.weather = {...weather, place: state.place.name, start: state.start, end: state.end};
+    state.weather = {...weather, place: state.place.name, start: state.start, end: state.end, fetchedAt: Date.now()};
     save();
     renderWeatherPreview();
     return true;
@@ -274,13 +274,22 @@ function renderWeatherPreview() {
   const lows = days.map((d) => d.tmin);
   const rainy = days.filter((d) => d.rain).length;
   const seasons = [...new Set(days.map((d) => SEASON_LABELS[seasonOf(d.date)]))].join(' и ').toLowerCase();
+  const fetched = w.fetchedAt
+    ? `, обновлён ${new Date(w.fetchedAt).toLocaleString('ru-RU', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'})}`
+    : '';
   const source =
-    w.source === 'forecast' ? 'прогноз' : `ориентир по тем же датам ${w.year} года, прогноза так далеко ещё нет`;
+    w.source === 'forecast'
+      ? `прогноз Open-Meteo${fetched}`
+      : `ориентир по тем же датам ${w.year} года, прогноза так далеко ещё нет${fetched}`;
+  const rainDays = days
+    .filter((d) => d.rain)
+    .map((d) => `${weekday(d.date)}${d.probability != null ? ` (${d.probability}%)` : ''}`)
+    .join(', ');
   box.hidden = false;
   box.innerHTML =
     `<span><b>${esc(placeLabel(state.place))}</b>, ${esc(weekday(w.start))} — ${esc(weekday(w.end))}</span>` +
     `<span>Днём ${formatTemp(Math.min(...highs))}…${formatTemp(Math.max(...highs))} °C, ночью ${formatTemp(Math.min(...lows))}…${formatTemp(Math.max(...lows))} °C (ощущается)</span>` +
-    `<span>${rainy ? `Дождь ${rainy} ${rainy === 1 ? 'день' : rainy < 5 ? 'дня' : 'дней'} из ${days.length}` : 'Без дождя'} · сезон: ${esc(seasons)}</span>` +
+    `<span>${rainy ? `Дождь ${rainy} ${rainy === 1 ? 'день' : rainy < 5 ? 'дня' : 'дней'} из ${days.length}: ${esc(rainDays)}` : 'Без дождя'} · сезон: ${esc(seasons)}</span>` +
     `<small>${esc(source)}</small>`;
 }
 
@@ -754,6 +763,19 @@ bind();
 renderWeatherPreview();
 if (state.built) {
   rebuild();
+}
+/* Прогноз обновляется при каждом открытии (не чаще раза в полчаса): сохранённый мог устареть на дни */
+const WEATHER_MAX_AGE = 30 * 60 * 1000;
+if (
+  state.mode === 'place' &&
+  state.place &&
+  (!state.weather || !state.weather.fetchedAt || Date.now() - state.weather.fetchedAt > WEATHER_MAX_AGE)
+) {
+  refreshWeather().then((ok) => {
+    if (ok && state.built) {
+      rebuild();
+    }
+  });
 }
 
 if ('serviceWorker' in navigator) {

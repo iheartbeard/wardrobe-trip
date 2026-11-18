@@ -5,7 +5,8 @@
  */
 
 const FORECAST_DAYS = 16;
-const RAIN_PROBABILITY = 50;
+/* Дождливым считается день с вероятностью дождя от 40% или от 2 мм осадков: зонт и обувь лучше взять с запасом */
+const RAIN_PROBABILITY = 40;
 const RAIN_MM = 2;
 const DAY_WEIGHT = 0.65;
 
@@ -87,6 +88,8 @@ export async function tripWeather(place, start, end, today = new Date()) {
       tmin: Math.round(tmin),
       tmax: Math.round(tmax),
       rain: mm >= RAIN_MM || (probability != null && probability >= RAIN_PROBABILITY),
+      probability,
+      mm: Math.round(mm * 10) / 10,
     };
   });
   return {
