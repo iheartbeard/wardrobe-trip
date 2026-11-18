@@ -74,7 +74,11 @@ for (const [name, trip] of Object.entries(trips)) {
           'худи максимум 1',
         );
         assert.ok(capsule.ids.filter((id) => TRIP_RULES.jeans.includes(id)).length <= TRIP_RULES.maxJeans);
-        assert.ok(capsule.ids.every((id) => ![...TRIP_RULES.notForWalking, ...TRIP_RULES.eventOnly].includes(id)));
+        assert.ok(
+          capsule.ids.every(
+            (id) => ![...TRIP_RULES.notForWalking, ...TRIP_RULES.eventOnly, ...TRIP_RULES.neverPack].includes(id),
+          ),
+        );
       });
 
       await t.test('план по дням: образ на каждый день', () => {
@@ -139,4 +143,11 @@ test('ручные дни и даты', () => {
     [10, 13, 15, 18, 20],
   );
   assert.deepEqual(dateRange('2026-12-30', '2027-01-02'), ['2026-12-30', '2026-12-31', '2027-01-01', '2027-01-02']);
+});
+
+test('Double Knee в поездки не берутся, даже закреплённые', () => {
+  for (const trip of Object.values(trips)) {
+    const capsule = buildCapsule(pool, manualDays(trip), {luggage: 'carryon', pinned: ['bd']});
+    assert.ok(!capsule.ids.includes('bd'));
+  }
 });
