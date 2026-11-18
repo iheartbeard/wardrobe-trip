@@ -259,7 +259,14 @@ async function refreshWeather() {
     return true;
   } catch {
     if (token === weatherToken) {
-      box.textContent = 'Погоду получить не удалось. Проверь сеть или задай погоду вручную.';
+      const w = state.weather;
+      const saved = w && w.place === state.place.name && w.start === state.start && w.end === state.end;
+      if (saved) {
+        /* Без сети показываем последний полученный прогноз, в подписи видно, когда он обновлён */
+        renderWeatherPreview();
+      } else {
+        box.textContent = 'Погоду получить не удалось. Проверь сеть или задай погоду вручную.';
+      }
     }
     return false;
   }
@@ -286,14 +293,25 @@ function renderWeatherPreview() {
       : `ориентир по тем же датам ${w.year} года, прогноза так далеко ещё нет${fetched}`;
   const rainDays = days
     .filter((d) => d.rain)
-    .map((d) => `${weekday(d.date)}${d.probability != null ? ` (${d.probability}%)` : ''}`)
-    .join(', ');
+    .map(
+      (d) =>
+        `<span class="wx-day">${esc(weekday(d.date))}${d.probability != null ? `<span class="wx-pct">${d.probability}%</span>` : ''}</span>`,
+    )
+    .join('');
+  const range = (list) => `${formatTemp(Math.min(...list))}…${formatTemp(Math.max(...list))} °C`;
+  const rainLabel = rainy
+    ? `${rainy} ${rainy === 1 ? 'день' : rainy < 5 ? 'дня' : 'дней'} из ${days.length}`
+    : 'не ожидается';
   box.hidden = false;
   box.innerHTML =
-    `<span><b>${esc(placeLabel(state.place))}</b>, ${esc(weekday(w.start))} — ${esc(weekday(w.end))}</span>` +
-    `<span>Днём ${formatTemp(Math.min(...highs))}…${formatTemp(Math.max(...highs))} °C, ночью ${formatTemp(Math.min(...lows))}…${formatTemp(Math.max(...lows))} °C (ощущается)</span>` +
-    `<span>${rainy ? `Дождь ${rainy} ${rainy === 1 ? 'день' : rainy < 5 ? 'дня' : 'дней'} из ${days.length}: ${esc(rainDays)}` : 'Без дождя'} · сезон: ${esc(seasons)}</span>` +
-    `<small>${esc(source)}</small>`;
+    `<div class="wx-head"><b>${esc(placeLabel(state.place))}</b><span>${esc(weekday(w.start))} — ${esc(weekday(w.end))}</span></div>` +
+    '<dl class="wx-rows">' +
+    `<dt>Днём</dt><dd>${range(highs)}</dd>` +
+    `<dt>Ночью</dt><dd>${range(lows)}</dd>` +
+    `<dt>Дождь</dt><dd>${rainLabel}${rainDays ? `<span class="wx-days">${rainDays}</span>` : ''}</dd>` +
+    `<dt>Сезон</dt><dd>${esc(seasons)}</dd>` +
+    '</dl>' +
+    `<small>Ощущаемая температура, ${esc(source)}</small>`;
 }
 
 /* ---------- сборка ---------- */

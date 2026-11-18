@@ -377,18 +377,61 @@
 .wx-preview {
   grid-column: 1 / -1;
   display: grid;
-  gap: 2px;
-  font-size: 13px;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.35;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 10px 12px;
+  padding: 12px 14px;
+  min-width: 0;
 }
-.wx-preview b {
+.wx-head {
+  display: grid;
+  gap: 2px;
+}
+.wx-head b {
   font-weight: 600;
+}
+.wx-head span {
+  color: var(--muted);
+  font-size: 13px;
+}
+/* Подпись слева, значение справа; длинные значения переносятся внутри своей колонки */
+.wx-rows {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 14px;
+  margin: 0;
+}
+.wx-rows dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+.wx-rows dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  min-width: 0;
+}
+.wx-days {
+  display: grid;
+  gap: 2px;
+  margin-top: 4px;
+}
+.wx-day {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  white-space: nowrap;
+}
+.wx-pct {
+  color: var(--rain);
+  font-family: var(--f-mono);
+  font-size: 12px;
 }
 .wx-preview small {
   color: var(--muted);
+  font-size: 12px;
 }
 #manual-fields .row {
   grid-column: 1 / -1;
