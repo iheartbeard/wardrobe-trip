@@ -179,3 +179,25 @@ test('закреплённые штаны, которые не подходят 
   const capsule = buildCapsule(pool, days, {luggage: 'carryon', pinned: ['g2', 'be']});
   assert.deepEqual(capsule.unusedPinned, ['g2']);
 });
+
+test('в дождливые дни пух и флис не идут верхним слоем, мак с Taion идёт', () => {
+  const days = [9, 10, 8, 7].map((t, i) => ({t, rain: i % 2 === 1, season: 'autumn'}));
+  const conditions = uniqueConditions(days);
+  const outfits = tripOutfits(pool, conditions);
+  conditions.forEach((cond, i) => {
+    if (cond.rain) {
+      outfits.filter((o) => o.conds.has(i)).forEach((o) => assert.ok(!TRIP_RULES.notInRain.includes(o.o), o.o));
+    }
+  });
+  assert.ok(outfits.some((o) => o.o === 'rokt' && [...o.conds].some((i) => conditions[i].rain)));
+  const capsule = buildCapsule(pool, days, {luggage: 'carryon'});
+  assert.ok(capsule.ids.every((id) => !TRIP_RULES.notInRain.includes(id) || pool.items[id].slot !== 'o'));
+});
+
+test('холодный дождь без непромокаемого тёплого верха: правило снимается и это отмечено', () => {
+  const capsule = buildCapsule(pool, manualDays({days: 5, tmin: 1, tmax: 6, rain: true, season: 'winter'}), {
+    luggage: 'carryon',
+  });
+  assert.deepEqual(capsule.gaps, []);
+  assert.ok(capsule.relaxedRain.length > 0);
+});

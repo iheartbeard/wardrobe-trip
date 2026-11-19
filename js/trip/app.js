@@ -480,6 +480,11 @@ function renderStats(capsule, days) {
       )
       .join('');
   }
+  if (capsule.relaxedRain.length) {
+    lines.push(
+      `Для ${capsule.relaxedRain.map(name).join(', ')} в гардеробе нет непромокаемого тёплого верха, поэтому в этот холодный дождь допущены пух или флис. Держи зонт.`,
+    );
+  }
   if (capsule.unusedPinned.length) {
     const names = capsule.unusedPinned.map((id) => `${pool.items[id].name} ${pool.items[id].colorName}`).join(', ');
     lines.push(

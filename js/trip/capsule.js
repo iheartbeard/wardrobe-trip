@@ -88,17 +88,40 @@ export function uniqueConditions(days) {
  */
 export function tripOutfits(pool, conditions) {
   const byKey = new Map();
+  const fits = (cond, outfit) => {
+    const model = pool.models[cond.season];
+    return (cond.rain ? outfit.rain : outfit.dry) & (1 << (cond.t - model.scale.min));
+  };
+  const inRange = (cond) => {
+    const model = pool.models[cond.season];
+    return model && cond.t >= model.scale.min && cond.t <= model.scale.max;
+  };
+  /*
+   * В дождь пух и флис верхним слоем не берутся. Если в какой-то дождливый день без них образа нет совсем
+   * (холодный дождь без непромокаемого тёплого верха), правило снимается на всю поездку: верх в капсуле один,
+   * и раз его всё равно везёшь, он идёт и в остальные дождливые дни.
+   */
+  let relaxRain = false;
+  conditions.forEach((cond) => {
+    if (!cond.rain || !inRange(cond)) {
+      return;
+    }
+    const fitting = pool.models[cond.season].outfits.filter((outfit) => fits(cond, outfit));
+    if (fitting.length && fitting.every((outfit) => TRIP_RULES.notInRain.includes(outfit.o))) {
+      cond.relaxedRain = true;
+      relaxRain = true;
+    }
+  });
   conditions.forEach((cond, index) => {
     const model = pool.models[cond.season];
     if (!model || cond.t < model.scale.min || cond.t > model.scale.max) {
       return;
     }
-    const bit = 1 << (cond.t - model.scale.min);
     const looks = new Set(model.looks.map((look) => look.ids.slice(0, 4).join('|')));
-    model.outfits.forEach((outfit) => {
-      if (!((cond.rain ? outfit.rain : outfit.dry) & bit)) {
-        return;
-      }
+    const use = model.outfits.filter(
+      (outfit) => fits(cond, outfit) && (relaxRain || !cond.rain || !TRIP_RULES.notInRain.includes(outfit.o)),
+    );
+    use.forEach((outfit) => {
       const key = `${outfit.o}|${outfit.m}|${outfit.b}|${outfit.s}`;
       let entry = byKey.get(key);
       if (!entry) {
@@ -543,6 +566,8 @@ export function buildCapsule(pool, days, options = {}) {
     replacedGaps: replacedIdx.map((i) => conditions[i]),
     restore,
     pinBlocked: [...pinBlocked],
+    /* Дождливые дни, где без пуха или флиса верхним слоем образа не собрать */
+    relaxedRain: conditions.filter((cond) => cond.relaxedRain),
     /* Закреплённые вещи, которые не входят ни в один образ на дни поездки (не по погоде или не сочетаются) */
     unusedPinned: pinned.filter(
       (id) =>
