@@ -239,3 +239,19 @@ test('сухие дни дороги без Gore-Tex и челси, дождли
   assert.ok(markTravelDays(wet)[0].travel === false);
   assert.equal(buildCapsule(pool, dry, {luggage: 'backpack'}).travelRule, false);
 });
+
+test('серые Uniqlo — в них уезжаю и возвращаюсь, если подходят по погоде', () => {
+  const T = [10, 10, 9, 9, 10];
+  const days = T.map((t, i) => ({
+    date: `2026-11-${20 + i}`,
+    t,
+    tmin: t - 4,
+    tmax: t + 2,
+    rain: i === 1,
+    season: 'autumn',
+  }));
+  const capsule = buildCapsule(pool, days, {luggage: 'carryon', pinned: ['ue', 'be', 'bm']});
+  const plan = planDays(pool, capsule, days);
+  assert.equal(plan[0].outfit.b, 'ue');
+  assert.equal(plan.at(-1).outfit.b, 'ue');
+});

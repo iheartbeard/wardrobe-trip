@@ -659,6 +659,10 @@ export function planDays(pool, capsule, days) {
       if (previous && previous.s === outfit.s) {
         value -= 1.5;
       }
+      // В дорогу (первый и последний день) — штаны для дороги, сколько бы раз они уже ни были.
+      if (road && TRIP_RULES.roadBottoms.includes(outfit.b)) {
+        value += 1000;
+      }
       if (value > pickValue) {
         pickValue = value;
         pick = outfit;
