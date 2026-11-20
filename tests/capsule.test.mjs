@@ -255,3 +255,20 @@ test('серые Uniqlo — в них уезжаю и возвращаюсь, е
   assert.equal(plan[0].outfit.b, 'ue');
   assert.equal(plan.at(-1).outfit.b, 'ue');
 });
+
+test('в дни дороги — свитер или худи, если есть в капсуле и подходит', () => {
+  const T = [10, 10, 9, 9, 10];
+  const days = T.map((t, i) => ({
+    date: `2026-11-${20 + i}`,
+    t,
+    tmin: t - 4,
+    tmax: t + 2,
+    rain: i === 1,
+    season: 'autumn',
+  }));
+  const capsule = buildCapsule(pool, days, {luggage: 'carryon', pinned: ['ue', 'be', 'bm', 'swf', 'ssc']});
+  const plan = planDays(pool, capsule, days);
+  for (const day of [plan[0], plan.at(-1)]) {
+    assert.ok(TRIP_RULES.roadBulkyMid.includes(pool.items[day.outfit.m].kind), day.outfit.m);
+  }
+});

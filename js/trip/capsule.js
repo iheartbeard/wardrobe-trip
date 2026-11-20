@@ -663,6 +663,10 @@ export function planDays(pool, capsule, days) {
       if (road && TRIP_RULES.roadBottoms.includes(outfit.b)) {
         value += 1000;
       }
+      // И объёмный средний слой: свитер или худи на себе освобождает место в чемодане.
+      if (road && TRIP_RULES.roadBulkyMid.includes(pool.items[outfit.m].kind)) {
+        value += 100;
+      }
       if (value > pickValue) {
         pickValue = value;
         pick = outfit;
