@@ -157,14 +157,59 @@ function fillInputs() {
   $('rain').checked = state.manual.rain;
   $('event').checked = state.event;
   $('bags-over').checked = state.bagsOver;
+  renderTravelShoes();
+}
+
+/** Подходит ли пара под погоду дня: по сезону, температуре и дождю, как в основном гардеробе. */
+function shoeFitsDay(id, day) {
+  const model = pool.models[day.season];
+  const item = model && model.byId[id];
+  const t = Math.round(day.t);
+  if (!item || t < model.scale.min || t > model.scale.max) {
+    return false;
+  }
+  const mask = day.rain ? item.rainMask : item.dryMask;
+  if (!(mask & (1 << (t - model.scale.min)))) {
+    return false;
+  }
+  /* В сухую дорогу без Gore-Tex и челси */
+  return day.rain || !TRIP_RULES.notOnDryTravel.includes(id);
+}
+
+/**
+ * Список пар для дороги. Пары, которые не подходят под погоду первого или последнего дня,
+ * показаны, но выбрать их нельзя. Если выбранная пара перестала подходить, выбор сбрасывается.
+ */
+let pendingShoeNote = '';
+
+function renderTravelShoes() {
   pool = pool || buildPool();
+  const days = tripDays();
+  const road = days.length ? [days[0], days[days.length - 1]] : [];
+  const fits = (id) => road.every((day) => shoeFitsDay(id, day));
   const shoes = Object.values(pool.items)
     .filter((item) => item.slot === 's')
-    .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+    .map((item) => ({item, ok: fits(item.id)}))
+    .sort((a, b) => Number(b.ok) - Number(a.ok) || a.item.name.localeCompare(b.item.name, 'ru'));
   $('travel-shoe').innerHTML =
     '<option value="">Нет, еду в одной из пар капсулы</option>' +
-    shoes.map((item) => `<option value="${esc(item.id)}">${esc(item.name)}, ${esc(item.colorName)}</option>`).join('');
-  $('travel-shoe').value = pool.items[state.travelShoe] ? state.travelShoe : '';
+    shoes
+      .map(
+        ({item, ok}) =>
+          `<option value="${esc(item.id)}"${ok ? '' : ' disabled'}>${esc(item.name)}, ${esc(item.colorName)}${ok ? '' : ' — не по погоде'}</option>`,
+      )
+      .join('');
+  let note = '';
+  if (state.travelShoe && !(pool.items[state.travelShoe] && fits(state.travelShoe))) {
+    if (pool.items[state.travelShoe]) {
+      note = `Пара для дороги сброшена: ${pool.items[state.travelShoe].name} не подходит под погоду в дни дороги.`;
+    }
+    state.travelShoe = '';
+    save();
+    pendingShoeNote = note;
+  }
+  $('travel-shoe').value = state.travelShoe || '';
+  return note;
 }
 
 /** Сезон ручного режима: выбранный или по сегодняшнему месяцу. */
@@ -338,6 +383,8 @@ function renderWeatherPreview() {
     '</dl>' +
     `<div class="wx-strip-wrap"><ol class="wx-strip" aria-label="Погода по дням">${strip}</ol></div>` +
     `<small>Ощущаемая температура, ${esc(source)}</small>`;
+  /* Список пар для дороги зависит от погоды в дни дороги */
+  status(renderTravelShoes() || $('status').textContent);
 }
 
 /* ---------- сборка ---------- */
@@ -402,6 +449,8 @@ function rebuild(swap = null) {
   }
   status('Собираю капсулу…');
   setTimeout(() => {
+    /* Сначала проверяем пару для дороги под погоду, потом собираем капсулу */
+    const shoeNote = renderTravelShoes();
     let capsule;
     if (swap && lastCapsule) {
       const slot = capsuleSlot(pool.items[swap]);
@@ -432,7 +481,8 @@ function rebuild(swap = null) {
     state.built = true;
     save();
     renderResult(capsule, plan, days);
-    status('');
+    status(shoeNote || pendingShoeNote);
+    pendingShoeNote = '';
   }, 30);
 }
 
