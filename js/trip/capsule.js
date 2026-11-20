@@ -243,7 +243,12 @@ export function buildCapsule(pool, days, options = {}) {
   if (limits.s > 2 && days.length <= TRIP_RULES.shortTripDays) {
     limits.s = 2;
   }
-  const ruleExcluded = [...TRIP_RULES.eventOnly, ...TRIP_RULES.notForWalking, ...TRIP_RULES.neverPack];
+  const ruleExcluded = [
+    ...TRIP_RULES.eventOnly,
+    ...TRIP_RULES.notForWalking,
+    ...TRIP_RULES.neverPack,
+    ...(options.bagsOver ? TRIP_RULES.waxed : []),
+  ];
   const excluded = new Set([...(options.excluded || []), ...ruleExcluded]);
   const pinned = (options.pinned || []).filter((id) => pool.items[id] && !excluded.has(id));
   const conditions = uniqueConditions(days);

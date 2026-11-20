@@ -42,6 +42,8 @@ const defaults = () => {
     luggage: DEFAULT_LUGGAGE,
     bags: {backpack: true, suitcase: true},
     event: false,
+    /* Рюкзак или сумка поверх куртки: вощёные куртки не берутся */
+    bagsOver: true,
     travelShoe: '',
     built: false,
     pinned: [],
@@ -153,6 +155,7 @@ function fillInputs() {
   $('tmax').value = state.manual.tmax;
   $('rain').checked = state.manual.rain;
   $('event').checked = state.event;
+  $('bags-over').checked = state.bagsOver;
   pool = pool || buildPool();
   const shoes = Object.values(pool.items)
     .filter((item) => item.slot === 's')
@@ -360,6 +363,7 @@ function compute(days, cycle) {
   return buildCapsule(pool, days, {
     luggage: state.luggage,
     event: state.event,
+    bagsOver: state.bagsOver,
     travelShoe: state.travelShoe,
     pinned: state.pinned,
     excluded: cycleExcluded(cycle),
@@ -706,6 +710,13 @@ function bind() {
   /* Даты и ручная погода запоминаются сразу, без нажатия «Собрать капсулу» */
   $('travel-shoe').addEventListener('change', () => {
     state.travelShoe = $('travel-shoe').value;
+    save();
+    if (lastCapsule) {
+      rebuild();
+    }
+  });
+  $('bags-over').addEventListener('change', () => {
+    state.bagsOver = $('bags-over').checked;
     save();
     if (lastCapsule) {
       rebuild();

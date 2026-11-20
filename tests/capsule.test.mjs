@@ -201,3 +201,12 @@ test('холодный дождь без непромокаемого тёпло
   assert.deepEqual(capsule.gaps, []);
   assert.ok(capsule.relaxedRain.length > 0);
 });
+
+test('с рюкзаком или сумкой поверх вощёная Transport не берётся', () => {
+  const days = [9, 10, 8, 9].map((t, i) => ({t, rain: i % 2 === 1, season: 'autumn'}));
+  for (const pinned of [[], ['tra']]) {
+    const capsule = buildCapsule(pool, days, {luggage: 'carryon', bagsOver: true, pinned});
+    assert.ok(!capsule.ids.includes('tra'));
+    assert.deepEqual(capsule.gaps, []);
+  }
+});
