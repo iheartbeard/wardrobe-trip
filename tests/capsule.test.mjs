@@ -210,3 +210,16 @@ test('с рюкзаком или сумкой поверх вощёная Transp
     assert.deepEqual(capsule.gaps, []);
   }
 });
+
+test('футболки: меньше цветов, по 2–3 одинаковых, всего на поездку', () => {
+  for (const trip of Object.values(trips)) {
+    for (const luggage of Object.keys(LUGGAGE)) {
+      const capsule = buildCapsule(pool, manualDays({...trip, days: 7}), {luggage});
+      const tees = ofSlot(capsule, 't');
+      const total = tees.reduce((sum, id) => sum + capsule.copies[id], 0);
+      assert.ok(tees.every((id) => capsule.copies[id] >= 1 && capsule.copies[id] <= TRIP_RULES.teeCopies));
+      assert.equal(total, Math.max(capsule.teeTotal, tees.length));
+      assert.ok(tees.length <= Math.max(2, Math.ceil(capsule.teeTotal / TRIP_RULES.teeCopies)), tees.join());
+    }
+  }
+});

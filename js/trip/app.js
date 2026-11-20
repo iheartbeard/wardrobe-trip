@@ -535,6 +535,9 @@ function renderCapsule(capsule) {
             wear.includes(item.id) ? 'надеть в дорогу' : '',
             extraTag(capsule, item.id),
           ].filter(Boolean);
+          if (capsule.copies[item.id] > 1) {
+            tags.unshift(`× ${capsule.copies[item.id]}`);
+          }
           if (extraTag(capsule, item.id)) {
             return `<div class="card tcard">${dot(item)}<span class="nm">${esc(item.name)}</span><span class="meta"><span>${esc(item.colorName)}</span>${tags.map((t) => `<span class="tg">${esc(t)}</span>`).join('')}</span></div>`;
           }
@@ -546,10 +549,12 @@ function renderCapsule(capsule) {
           );
         })
         .join('');
-      const limit = capsule.limits[slot];
+      const limit = slot === 't' ? capsule.teeTotal : capsule.limits[slot];
       /* Пара для дороги считается в лимите обуви, пара под мероприятие идёт сверх него */
-      const daily = bySlot[slot].filter((item) => !capsule.eventItems.includes(item.id)).length;
-      const extra = bySlot[slot].length - daily;
+      const daily = bySlot[slot]
+        .filter((item) => !capsule.eventItems.includes(item.id))
+        .reduce((sum, item) => sum + (capsule.copies[item.id] || 1), 0);
+      const extra = bySlot[slot].filter((item) => capsule.eventItems.includes(item.id)).length;
       const counter = limit
         ? ` <span class="cnt">${daily} из ${limit}${extra ? ` + ${extra} сверх лимита` : ''}</span>`
         : '';
@@ -624,7 +629,8 @@ function renderPack(capsule) {
     const done = state.packed.includes(id);
     const item = pool.items[id];
     const tag = extraTag(capsule, id);
-    const body = `${miniDot(item)}<span>${esc(item.name)} <em>${esc(item.colorName)}</em>${tag ? ` <span class="tg">${tag}</span>` : ''}</span>`;
+    const count = capsule.copies[id] > 1 ? ` <span class="tg">× ${capsule.copies[id]}</span>` : '';
+    const body = `${miniDot(item)}<span>${esc(item.name)} <em>${esc(item.colorName)}</em>${count}${tag ? ` <span class="tg">${tag}</span>` : ''}</span>`;
     return `<li><label class="${done ? 'done' : ''}"><input type="checkbox" data-pack="${esc(id)}"${done ? ' checked' : ''} />${body}</label></li>`;
   };
   $('pack').innerHTML = sections

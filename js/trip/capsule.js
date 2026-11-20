@@ -271,6 +271,9 @@ export function buildCapsule(pool, days, options = {}) {
     limits[slot] = Math.max(limits[slot], pinnedCounts[slot]);
   });
   limits.t = Math.min(limits.t, Math.max(2, days.length, pinnedCounts.t));
+  /* Футболок всего на поездку столько, а цветов меньше: каждого цвета по 2–3 одинаковых */
+  const teeTotal = limits.t;
+  limits.t = Math.max(2, Math.ceil(teeTotal / TRIP_RULES.teeCopies), pinnedCounts.t);
   limits.s -= travelItems.length;
 
   const all = tripOutfits(pool, conditions);
@@ -451,12 +454,13 @@ export function buildCapsule(pool, days, options = {}) {
     return {chosen: picked, counts: count, fits, add};
   }
 
-  /* Футболки: добираем до лимита теми, что сочетаются со всем остальным (если капсула вообще собралась) */
+  /*
+   * Футболки: каждого цвета есть по 2–3 штуки, поэтому берётся как можно меньше цветов (не меньше двух),
+   * но по несколько одинаковых, всего столько, сколько нужно на поездку. Цвета — те, что сочетаются со всем.
+   */
   const hasClothes = [...chosen].some((id) => capsuleSlot(pool.items[id]) !== 't');
-  const teeCandidates = Object.values(pool.items).filter(
-    (item) => capsuleSlot(item) === 't' && !chosen.has(item.id) && !excluded.has(item.id),
-  );
-  teeCandidates
+  Object.values(pool.items)
+    .filter((item) => capsuleSlot(item) === 't' && !chosen.has(item.id) && !excluded.has(item.id))
     .map((tee) => ({tee, fit: [...chosen].filter((id) => compatible(tee.id, id)).length}))
     .sort((a, b) => b.fit - a.fit)
     .forEach(({tee}) => {
@@ -464,6 +468,18 @@ export function buildCapsule(pool, days, options = {}) {
         best.add(tee.id);
       }
     });
+  const teeIds = [...chosen].filter((id) => capsuleSlot(pool.items[id]) === 't');
+  const copies = {};
+  teeIds.forEach((id) => (copies[id] = 0));
+  for (let left = hasClothes ? Math.max(teeTotal, teeIds.length) : 0, k = 0; left > 0 && teeIds.length; k++) {
+    const id = teeIds[k % teeIds.length];
+    if (copies[id] < TRIP_RULES.teeCopies) {
+      copies[id] += 1;
+      left -= 1;
+    } else if (teeIds.every((t) => copies[t] >= TRIP_RULES.teeCopies)) {
+      break;
+    }
+  }
 
   const capsuleOutfits = outfits.filter((outfit) => outfit.ids.every((id) => chosen.has(id)));
   const clothes = [...chosen];
@@ -560,6 +576,9 @@ export function buildCapsule(pool, days, options = {}) {
     ids: [...chosen, ...eventItems, ...travelItems],
     travelItems,
     eventItems,
+    teeTotal,
+    /* Сколько штук каждой футболки взять */
+    copies,
     outfits: capsuleOutfits,
     gaps: gapIdx.map((i) => conditions[i]),
     outerShort: outfits.outerShort,
@@ -634,7 +653,8 @@ export function planDays(pool, capsule, days) {
 
     let tee = null;
     if (pool.items[pick.m].kind !== 'tee' && tees.length) {
-      tee = [...tees].sort((a, b) => (teeUse[a] || 0) - (teeUse[b] || 0))[0];
+      const share = (id) => (teeUse[id] || 0) / (capsule.copies[id] || 1);
+      tee = [...tees].sort((a, b) => share(a) - share(b))[0];
       teeUse[tee] = (teeUse[tee] || 0) + 1;
     }
     const model = pool.models[day.season];
