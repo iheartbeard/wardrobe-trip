@@ -15,6 +15,7 @@ import {
   planDays,
   SEASON_LABELS,
   seasonOf,
+  TRIP_RULES,
 } from './capsule.js';
 import {searchPlaces, tripWeather} from './forecast.js';
 
@@ -257,6 +258,23 @@ async function refreshWeather() {
     const weather = await tripWeather(state.place, state.start, state.end);
     if (token !== weatherToken) {
       return false;
+    }
+    /* Дни дороги: дождь дома (откуда уезжаешь и куда возвращаешься) тоже считается */
+    weather.days.forEach((day) => {
+      day.destRain = day.rain;
+    });
+    try {
+      const home = await tripWeather(TRIP_RULES.home, state.start, state.end);
+      const ends = [0, weather.days.length - 1];
+      ends.forEach((i) => {
+        const homeDay = home.days[i];
+        if (homeDay && weather.days[i]) {
+          weather.days[i].homeRain = homeDay.rain;
+          weather.days[i].rain = weather.days[i].rain || homeDay.rain;
+        }
+      });
+    } catch {
+      /* без погоды дома считаем только место назначения */
     }
     state.weather = {...weather, place: state.place.name, start: state.start, end: state.end, fetchedAt: Date.now()};
     save();
@@ -565,11 +583,12 @@ function renderCapsule(capsule) {
 
 function renderPlan(plan) {
   $('plan').innerHTML = plan
-    .map(({day, outfit, shoe, travel, tee, head, scarf}, index) => {
+    .map(({day, outfit, shoe, road, tee, head, scarf}, index) => {
       const title = day.date ? weekday(day.date) : `День ${index + 1}`;
       const range = day.tmin != null ? `<small>${formatTemp(day.tmin)}…${formatTemp(day.tmax)}</small>` : '';
       const badge =
-        (travel ? '<span class="road">в дороге</span>' : '') + (day.rain ? '<span class="rainy">дождь</span>' : '');
+        (road ? '<span class="road">в дороге</span>' : '') +
+        (day.rain ? `<span class="rainy">${day.homeRain && !day.destRain ? 'дождь дома' : 'дождь'}</span>` : '');
       if (!outfit) {
         return `<article class="day"><header><b>${esc(title)}</b><span class="t">${formatTemp(day.t)}°${range}</span>${badge}</header><p class="note">Нет образа из капсулы на эту погоду, причина написана над капсулой.</p></article>`;
       }

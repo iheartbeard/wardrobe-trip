@@ -12,6 +12,7 @@ import {
   seasonOf,
   tripOutfits,
   uniqueConditions,
+  markTravelDays,
 } from '../js/trip/capsule.js';
 import {evaluateColors} from '../js/trip/wardrobe.js';
 import {dateRange} from '../js/trip/forecast.js';
@@ -222,4 +223,19 @@ test('футболки: меньше цветов, по 2–3 одинаковы
       assert.ok(tees.length <= Math.max(2, Math.ceil(capsule.teeTotal / TRIP_RULES.teeCopies)), tees.join());
     }
   }
+});
+
+test('сухие дни дороги без Gore-Tex и челси, дождливые — можно', () => {
+  const rule = TRIP_RULES.notOnDryTravel;
+  const dry = [8, 10, 9, 7, 9].map((t, i) => ({t, rain: i === 2, season: 'autumn'}));
+  const capsule = buildCapsule(pool, dry, {luggage: 'carryon'});
+  const plan = planDays(pool, capsule, dry);
+  assert.ok(plan[0].road && plan[plan.length - 1].road && !plan[1].road);
+  assert.ok(!rule.includes(plan[0].shoe), plan[0].shoe);
+  assert.ok(!rule.includes(plan[plan.length - 1].shoe), plan[plan.length - 1].shoe);
+  assert.deepEqual(capsule.gaps, []);
+  /* В дождливый день дороги правило не действует, с одной парой обуви тоже */
+  const wet = dry.map((d, i) => ({...d, rain: i === 0 || i === 2}));
+  assert.ok(markTravelDays(wet)[0].travel === false);
+  assert.equal(buildCapsule(pool, dry, {luggage: 'backpack'}).travelRule, false);
 });

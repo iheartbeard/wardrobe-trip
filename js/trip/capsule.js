@@ -71,13 +71,23 @@ export const capsuleSlot = (item) =>
 /** Пары слотов, вещи из которых не надеваются одновременно: их между собой сочетать не нужно. */
 const notWornTogether = (a, b) => a === b;
 
+/** Помечает сухие первый и последний день как дорогу. */
+export function markTravelDays(days, on = true) {
+  return days.map((day, i) => ({...day, travel: on && !day.rain && (i === 0 || i === days.length - 1)}));
+}
+
 /** Условия поездки без повторов: [{t, rain, season}]. */
 export function uniqueConditions(days) {
   const seen = new Map();
   days.forEach((day) => {
     const t = Math.round(day.t);
     const season = day.season;
-    seen.set(`${season}|${t}|${day.rain ? 1 : 0}`, {t, rain: !!day.rain, season});
+    const cond = {t, rain: !!day.rain, season};
+    if (day.travel) {
+      /* Сухой день в дороге — отдельное условие: на него своя обувь */
+      cond.travel = true;
+    }
+    seen.set(`${season}|${t}|${day.rain ? 1 : 0}|${day.travel ? 1 : 0}`, cond);
   });
   return [...seen.values()].sort((a, b) => a.t - b.t || Number(a.rain) - Number(b.rain));
 }
@@ -119,7 +129,10 @@ export function tripOutfits(pool, conditions) {
     }
     const looks = new Set(model.looks.map((look) => look.ids.slice(0, 4).join('|')));
     const use = model.outfits.filter(
-      (outfit) => fits(cond, outfit) && (relaxRain || !cond.rain || !TRIP_RULES.notInRain.includes(outfit.o)),
+      (outfit) =>
+        fits(cond, outfit) &&
+        (relaxRain || !cond.rain || !TRIP_RULES.notInRain.includes(outfit.o)) &&
+        !(cond.travel && TRIP_RULES.notOnDryTravel.includes(outfit.s)),
     );
     use.forEach((outfit) => {
       const key = `${outfit.o}|${outfit.m}|${outfit.b}|${outfit.s}`;
@@ -251,7 +264,13 @@ export function buildCapsule(pool, days, options = {}) {
   ];
   const excluded = new Set([...(options.excluded || []), ...ruleExcluded]);
   const pinned = (options.pinned || []).filter((id) => pool.items[id] && !excluded.has(id));
-  const conditions = uniqueConditions(days);
+  /*
+   * Первый и последний день — дорога. В сухой день дороги нужна обувь без Gore-Tex и не челси.
+   * Правило работает, когда в капсуле больше одной пары и нет отдельной пары только для дороги.
+   */
+  const travelRule = !options.travelShoe && (LUGGAGE[options.luggage] || LUGGAGE[DEFAULT_LUGGAGE]).s > 1;
+  const markedDays = markTravelDays(days, travelRule);
+  const conditions = uniqueConditions(markedDays);
   const compatible = pairChecker(pool);
   const isJeans = (id) => TRIP_RULES.jeans.includes(id);
   const isHoodie = (id) => pool.items[id].kind === TRIP_RULES.hoodieKind;
@@ -576,6 +595,7 @@ export function buildCapsule(pool, days, options = {}) {
     ids: [...chosen, ...eventItems, ...travelItems],
     travelItems,
     eventItems,
+    travelRule,
     teeTotal,
     /* Сколько штук каждой футболки взять */
     copies,
@@ -613,11 +633,13 @@ export function planDays(pool, capsule, days) {
   const scarves = capsule.ids.filter((id) => pool.items[id].slot === 'sc');
   let previous = null;
 
+  const marked = markTravelDays(days, capsule.travelRule);
   return days.map((day, dayIndex) => {
-    const travel = capsule.travelItems.length > 0 && (dayIndex === 0 || dayIndex === days.length - 1);
+    const road = dayIndex === 0 || dayIndex === days.length - 1;
+    const travel = capsule.travelItems.length > 0 && road;
     const t = Math.round(day.t);
     const condIndex = capsule.conditions.findIndex(
-      (c) => c.t === t && c.rain === !!day.rain && c.season === day.season,
+      (c) => c.t === t && c.rain === !!day.rain && c.season === day.season && !!c.travel === marked[dayIndex].travel,
     );
     const options = capsule.outfits.filter((outfit) => outfit.conds.has(condIndex));
     let pick = null;
@@ -643,7 +665,7 @@ export function planDays(pool, capsule, days) {
       }
     });
     if (!pick) {
-      return {day, outfit: null, shoe: null, travel, tee: null, head: null, scarf: null};
+      return {day, outfit: null, shoe: null, travel, road, tee: null, head: null, scarf: null};
     }
     usedKey.add(pick.ids.join('|'));
     [pick.m, pick.b, pick.o, pick.s].forEach((id) => {
@@ -667,6 +689,7 @@ export function planDays(pool, capsule, days) {
       outfit: pick,
       shoe: travel ? capsule.travelItems[0] : pick.s,
       travel,
+      road,
       tee,
       head: heads.find(fitsDay) || null,
       scarf: scarves.find(fitsDay) || null,
